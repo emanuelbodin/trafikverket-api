@@ -1,0 +1,23 @@
+{
+  "name": "trafikverket-api",
+  "version": "1.0.0",
+  "main": "src/app.js",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx --watch src/app.ts",
+    "build": "tsc"
+  },
+  "author": "Emanuel Bodin",
+  "license": "ISC",
+  "description": "",
+  "devDependencies": {
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3"
+  },
+  "dependencies": {
+    "@libs/xml": "npm:@jsr/libs__xml@^7.0.2",
+    "@types/express": "^5.0.5",
+    "dotenv": "^17.2.3",
+    "express": "^5.1.0"
+  }
+}
