@@ -36,7 +36,7 @@ const buildAnnouncementDto = (announcement: Announcement): AnnouncementDto => {
       code: info.Code,
       description: info.Description,
     })),
-    productInformation: announcement.ProductInformation.map((info) => ({
+    productInformation: announcement.ProductInformation?.map((info) => ({
       code: info.Code,
       description: info.Description,
     })),
@@ -60,7 +60,7 @@ const getFormattedAnnouncementDtos = (
       )?.locationName ?? '';
     const toName =
       stations.find((station) => {
-        return announcement.toLocation.length > 0
+        return announcement.toLocation?.length > 0
           ? station.locationSignature ===
               announcement.toLocation[0].locationName
           : undefined;
