@@ -1,4 +1,5 @@
 export type Announcement = {
+  ActivityId: string;
   LocationSignature: string;
   AdvertisedTimeAtLocation: string;
   EstimatedTimeAtLocation: string;
@@ -24,6 +25,7 @@ export interface FormattedAnnouncement extends Announcement {
 }
 
 export type AnnouncementDto = {
+  activityId: string;
   locationSignature: string;
   advertisedTimeAtLocation: string;
   estimatedTimeAtLocation: string;

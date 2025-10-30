@@ -46,6 +46,8 @@ const router = Router();
  *               items:
  *                 type: object
  *                 properties:
+ *                   activityId:
+ *                     type: string
  *                   locationSignature:
  *                     type: string
  *                     description: Station code/signature

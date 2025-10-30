@@ -15,6 +15,7 @@ import client from '../trafikverket/client.js';
 
 const buildAnnouncementDto = (announcement: Announcement): AnnouncementDto => {
   return {
+    activityId: announcement.ActivityId,
     locationSignature: announcement.LocationSignature,
     advertisedTimeAtLocation: announcement.AdvertisedTimeAtLocation,
     estimatedTimeAtLocation: announcement.EstimatedTimeAtLocation,
