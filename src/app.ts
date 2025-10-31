@@ -13,6 +13,10 @@ app.get('/', (_req, res) =>
 app.get('/health', (_req, res) => res.send('OK'));
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
+app.get('/openapi.json', (req, res) => {
+  res.setHeader('Content-Type', 'application/json');
+  res.send(swaggerSpec);
+});
 const apiRouter = express.Router();
 apiRouter.use('/stations', stationsRouter);
 apiRouter.use('/train', trainRouter);
