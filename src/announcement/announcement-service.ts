@@ -19,9 +19,7 @@ const buildAnnouncementDto = (announcement: Announcement): AnnouncementDto => {
     locationSignature: announcement.LocationSignature,
     advertisedTimeAtLocation: announcement.AdvertisedTimeAtLocation,
     estimatedTimeAtLocation: announcement.EstimatedTimeAtLocation,
-    estimatedTimeIsPreliminary: announcement.EstimatedTimeIsPreliminary,
     advertisedTrainIdent: announcement.AdvertisedTrainIdent,
-    advertisedTrainReference: announcement.AdvertisedTrainReference,
     toLocation: announcement.ToLocation?.map((loc) => ({
       locationName: loc.LocationName,
       priority: loc.Priority,
@@ -48,18 +46,6 @@ const buildAnnouncementDto = (announcement: Announcement): AnnouncementDto => {
       code: announcement.Deviation?.Code,
       description: announcement.Deviation?.Description,
     },
-    operationalTransportIdentifiers:
-      announcement.OperationalTransportIdentifiers?.map((id) => ({
-        objectType: id.ObjectType,
-        company: id.Company,
-        core: id.Core,
-        variant: id.Variant,
-        timetableYear: id.TimetableYear,
-        startDate: id.StartDate,
-      })),
-    plannedEstimatedTimeAtLocation: announcement.PlannedEstimatedTimeAtLocation,
-    plannedEstimatedTimeAtLocationIsValid:
-      announcement.PlannedEstimatedTimeAtLocationIsValid,
   };
 };
 

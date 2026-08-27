@@ -38,10 +38,10 @@ const post = async <T>(
     cache: 'no-cache',
   });
 
-  // 206 means the result set was truncated as too large — not an empty set.
+  // 206 is "response too large" (page with changeid), not an empty set.
   if (response.status === 206) {
     throw new Error(
-      'Trafikverket response too large (HTTP 206); narrow the query'
+      'Trafikverket response too large (HTTP 206); use changeid to page'
     );
   }
 
