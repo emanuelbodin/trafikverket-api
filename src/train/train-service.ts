@@ -1,25 +1,25 @@
 import client from '../trafikverket/client.js';
-import { getTrainPositionQuery } from './train-queries.js';
-
-type TrainPositionResponse = {
-  TrainPosition: TrainPosition[];
-};
+import {
+  getTrainPositionForTrainQuery,
+  getTrainPositionQuery,
+} from './train-queries.js';
 
 type TrainPosition = {
-  Train: {
-    OperationalTrainNumber: string;
-    OperationalTrainDepartureDate: string;
-    JourneyPlanNumber: string;
-    JourneyPlanDepartureDate: string;
-    AdvertisedTrainNumber: string;
+  Train?: {
+    OperationalTrainNumber?: string;
+    OperationalTrainDepartureDate?: string;
+    JourneyPlanNumber?: string;
+    JourneyPlanDepartureDate?: string;
+    AdvertisedTrainNumber?: string;
   };
-  Position: {
-    WGS84: string;
+  Position?: {
+    WGS84?: string;
   };
-  Status: {
-    Active: boolean;
+  Status?: {
+    Active?: boolean;
   };
-  ModifiedTime: string;
+  Speed?: number;
+  ModifiedTime?: string;
 };
 
 export type TrainPositionDto = {
@@ -39,28 +39,86 @@ export type TrainPositionDto = {
   modifiedTime: string;
 };
 
+export type TrainPositionRecord = {
+  advertisedTrainNumber?: string;
+  wgs84?: string;
+  speed?: number;
+  active?: boolean;
+  modifiedTime?: string;
+};
+
 const buildTrainPositionDto = (position: TrainPosition): TrainPositionDto => {
   return {
     train: {
-      operationalTrainNumber: position.Train.OperationalTrainNumber,
+      operationalTrainNumber: position.Train?.OperationalTrainNumber ?? '',
       operationalTrainDepartureDate:
-        position.Train.OperationalTrainDepartureDate,
-      journeyPlanNumber: position.Train.JourneyPlanNumber,
-      journeyPlanDepartureDate: position.Train.JourneyPlanDepartureDate,
-      advertisedTrainNumber: position.Train.AdvertisedTrainNumber,
+        position.Train?.OperationalTrainDepartureDate ?? '',
+      journeyPlanNumber: position.Train?.JourneyPlanNumber ?? '',
+      journeyPlanDepartureDate: position.Train?.JourneyPlanDepartureDate ?? '',
+      advertisedTrainNumber: position.Train?.AdvertisedTrainNumber ?? '',
     },
     position: {
-      wgs84: position.Position.WGS84,
+      wgs84: position.Position?.WGS84 ?? '',
     },
     status: {
-      active: position.Status.Active,
+      active: position.Status?.Active ?? false,
     },
+    modifiedTime: position.ModifiedTime ?? '',
+  };
+};
+
+const toTrainPositionRecord = (
+  position: TrainPosition
+): TrainPositionRecord => {
+  const speed =
+    typeof position.Speed === 'number' && Number.isFinite(position.Speed)
+      ? position.Speed
+      : undefined;
+  return {
+    advertisedTrainNumber: position.Train?.AdvertisedTrainNumber,
+    wgs84: position.Position?.WGS84,
+    speed,
+    active: position.Status?.Active,
     modifiedTime: position.ModifiedTime,
   };
 };
 
+const byModifiedTimeDesc = (
+  a: TrainPosition,
+  b: TrainPosition
+): number => {
+  const aTime = a.ModifiedTime ?? '';
+  const bTime = b.ModifiedTime ?? '';
+  return bTime.localeCompare(aTime);
+};
+
+/** WKT `POINT (lng lat)` → numeric lat/lng. Trafikverket WGS84 uses lon then lat. */
+export const parseWgs84Point = (
+  wgs84: string | undefined
+): { lat: number; lng: number } | undefined => {
+  if (!wgs84) return undefined;
+  const match = wgs84.match(
+    /POINT\s*\(\s*([+-]?\d+(?:\.\d+)?)\s+([+-]?\d+(?:\.\d+)?)\s*\)/i
+  );
+  if (!match) return undefined;
+  const lng = Number(match[1]);
+  const lat = Number(match[2]);
+  if (!Number.isFinite(lat) || !Number.isFinite(lng)) return undefined;
+  return { lat, lng };
+};
+
 export const fetchTrainPositions = async () => {
   const query = getTrainPositionQuery();
-  const res = await client.post<TrainPositionResponse>(query, 'TrainPosition');
-  return res.TrainPosition.map((p) => buildTrainPositionDto(p));
+  const positions = await client.post<TrainPosition[]>(query, 'TrainPosition');
+  return positions.map((p) => buildTrainPositionDto(p));
+};
+
+export const fetchLatestTrainPosition = async (
+  trainId: string
+): Promise<TrainPositionRecord | undefined> => {
+  const query = getTrainPositionForTrainQuery(trainId);
+  const positions = await client.post<TrainPosition[]>(query, 'TrainPosition');
+  if (positions.length === 0) return undefined;
+  const latest = [...positions].sort(byModifiedTimeDesc)[0];
+  return toTrainPositionRecord(latest);
 };

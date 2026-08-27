@@ -1,5 +1,8 @@
+type DeviationItem = { Code: string; Description: string };
+
 export type Announcement = {
   ActivityId: string;
+  ActivityType: string;
   LocationSignature: string;
   AdvertisedTimeAtLocation: string;
   EstimatedTimeAtLocation: string;
@@ -18,7 +21,7 @@ export type Announcement = {
   OtherInformation: { Code: string; Description: string }[];
   ProductInformation: { Code: string; Description: string }[];
   ModifiedTime: string;
-  Deviation: { Code: string; Description: string };
+  Deviation: DeviationItem | DeviationItem[];
   OperationalTransportIdentifiers: {
     ObjectType: string;
     Company: string;
@@ -38,6 +41,7 @@ export interface FormattedAnnouncement extends Announcement {
 
 export type AnnouncementDto = {
   activityId: string;
+  activityType: string;
   locationSignature: string;
   advertisedTimeAtLocation: string;
   estimatedTimeAtLocation: string;
@@ -56,7 +60,7 @@ export type AnnouncementDto = {
   otherInformation: { code: string; description: string }[];
   productInformation: { code: string; description: string }[];
   modifiedTime: string;
-  deviation: { code: string; description: string };
+  deviation: { code?: string; description?: string };
   operationalTransportIdentifiers: {
     objectType: string;
     company: string;

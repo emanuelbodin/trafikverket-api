@@ -5,6 +5,7 @@ import {
 import {
   getAnnouncementsAtStationQuery,
   getAnnouncementsForTrainQuery,
+  getAnnouncementsForTrainReferenceQuery,
   type StationActivityType,
 } from './announcement-queries.js';
 import type {
@@ -14,9 +15,28 @@ import type {
 } from './announcement.types.ts';
 import client from '../trafikverket/client.js';
 
+const deviationItems = (deviation: Announcement['Deviation']) => {
+  if (!deviation) return [];
+  return Array.isArray(deviation) ? deviation : [deviation];
+};
+
+const buildDeviationDto = (deviation: Announcement['Deviation']) => {
+  const items = deviationItems(deviation).filter(
+    (item) => item.Code || item.Description
+  );
+  const descriptions = items
+    .map((item) => item.Description)
+    .filter((description): description is string => Boolean(description));
+  return {
+    code: items[0]?.Code,
+    description: descriptions.length ? descriptions.join('. ') : undefined,
+  };
+};
+
 const buildAnnouncementDto = (announcement: Announcement): AnnouncementDto => {
   return {
     activityId: announcement.ActivityId,
+    activityType: announcement.ActivityType,
     locationSignature: announcement.LocationSignature,
     advertisedTimeAtLocation: announcement.AdvertisedTimeAtLocation,
     estimatedTimeAtLocation: announcement.EstimatedTimeAtLocation,
@@ -45,10 +65,7 @@ const buildAnnouncementDto = (announcement: Announcement): AnnouncementDto => {
       description: info.Description,
     })),
     modifiedTime: announcement.ModifiedTime,
-    deviation: {
-      code: announcement.Deviation?.Code,
-      description: announcement.Deviation?.Description,
-    },
+    deviation: buildDeviationDto(announcement.Deviation),
     operationalTransportIdentifiers:
       announcement.OperationalTransportIdentifiers?.map((id) => ({
         objectType: id.ObjectType,
@@ -85,15 +102,41 @@ const getFormattedAnnouncementDtos = (
   });
 };
 
-export const fetchAnnouncementsForTrain = async (trainId: string) => {
-  const query = getAnnouncementsForTrainQuery(trainId);
+const fetchFormattedAnnouncements = async (
+  query: ReturnType<typeof getAnnouncementsForTrainQuery>
+) => {
   const announcements = await client.post<Announcement[]>(
     query,
     'TrainAnnouncement'
   );
+  if (announcements.length === 0) return [];
   const announcementDtos = announcements.map((a) => buildAnnouncementDto(a));
   const stations = await fetchAllStations();
   return getFormattedAnnouncementDtos(announcementDtos, stations);
+};
+
+export const fetchAnnouncementsForTrain = async (trainId: string) =>
+  fetchFormattedAnnouncements(getAnnouncementsForTrainQuery(trainId));
+
+export const fetchAnnouncementsForTrainReference = async (trainId: string) =>
+  fetchFormattedAnnouncements(getAnnouncementsForTrainReferenceQuery(trainId));
+
+/** AdvertisedTrainIdent, or AdvertisedTrainReference when that is a unique match. */
+export const resolveAnnouncementsForTrainId = async (trainId: string) => {
+  const id = trainId.trim();
+  if (!id) return [];
+
+  const byIdent = await fetchAnnouncementsForTrain(id);
+  if (byIdent.length > 0) return byIdent;
+
+  const byReference = await fetchAnnouncementsForTrainReference(id);
+  const idents = new Set(
+    byReference
+      .map((announcement) => announcement.advertisedTrainIdent)
+      .filter((ident): ident is string => Boolean(ident))
+  );
+  if (idents.size === 1) return byReference;
+  return [];
 };
 
 export const fetchAnnouncementsAtStation = async (
