@@ -10,11 +10,4 @@ Express wrapper around [Trafikverket's open railway data](https://www.trafikverk
 
 Listens on port 3000.
 
-## Docs
-
-Swagger UI: [http://localhost:3000/api-docs](http://localhost:3000/api-docs)  
-OpenAPI JSON: [http://localhost:3000/openapi.json](http://localhost:3000/openapi.json)
-
-```bash
-curl "http://localhost:3000/api/announcements/departures/Cst"
-```
+The API is documented in Swagger at [http://localhost:3000/api-docs](http://localhost:3000/api-docs) (OpenAPI JSON at `/openapi.json`).
