@@ -47,12 +47,15 @@ const advertisedTimeWindow = {
   },
 };
 
-export const getDeparturesFromStationQuery = (
+export type StationActivityType = 'Avgang' | 'Ankomst';
+
+export const getAnnouncementsAtStationQuery = (
   stationId: string,
+  activityType: StationActivityType,
   canceled?: boolean
 ) => {
   const eq: { '@name': string; '@value': string }[] = [
-    { '@name': 'ActivityType', '@value': 'Avgang' },
+    { '@name': 'ActivityType', '@value': activityType },
     { '@name': 'LocationSignature', '@value': stationId },
   ];
   if (canceled !== undefined) {
@@ -70,6 +73,16 @@ export const getDeparturesFromStationQuery = (
     INCLUDE: trainAnnouncementProperties,
   };
 };
+
+export const getDeparturesFromStationQuery = (
+  stationId: string,
+  canceled?: boolean
+) => getAnnouncementsAtStationQuery(stationId, 'Avgang', canceled);
+
+export const getArrivalsAtStationQuery = (
+  stationId: string,
+  canceled?: boolean
+) => getAnnouncementsAtStationQuery(stationId, 'Ankomst', canceled);
 
 export const getAnnouncementsForTrainQuery = (trainId: string) => {
   return {
