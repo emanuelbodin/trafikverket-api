@@ -3,6 +3,7 @@ const trainAnnouncementProperties = [
   'ActivityType',
   'AdvertisedTimeAtLocation',
   'AdvertisedTrainIdent',
+  'AdvertisedTrainReference',
   'Operator',
   'OtherInformation',
   'TimeAtLocationWithSeconds',
@@ -13,41 +14,57 @@ const trainAnnouncementProperties = [
   'ViaFromLocation',
   'FromLocation',
   'EstimatedTimeAtLocation',
+  'EstimatedTimeIsPreliminary',
   'LocationSignature',
-  'ActivityType',
   'Canceled',
   'ProductInformation',
   'ModifiedTime',
   'Deviation',
+  'OperationalTransportIdentifiers',
+  'PlannedEstimatedTimeAtLocation',
+  'PlannedEstimatedTimeAtLocationIsValid',
 ];
+
+const trainAnnouncementQueryBase = {
+  '@objecttype': 'TrainAnnouncement',
+  '@schemaversion': '2.0',
+  '@namespace': 'Rail.TrafficInfo',
+  '@orderby': 'AdvertisedTimeAtLocation',
+};
+
+const advertisedTimeWindow = {
+  OR: {
+    AND: {
+      GT: {
+        '@name': 'AdvertisedTimeAtLocation',
+        '@value': '$dateadd(-23:59:59)',
+      },
+      LT: {
+        '@name': 'AdvertisedTimeAtLocation',
+        '@value': '$dateadd(12:00:00)',
+      },
+    },
+  },
+};
 
 export const getDeparturesFromStationQuery = (
   stationId: string,
-  canceled: boolean
+  canceled?: boolean
 ) => {
+  const eq: { '@name': string; '@value': string }[] = [
+    { '@name': 'ActivityType', '@value': 'Avgang' },
+    { '@name': 'LocationSignature', '@value': stationId },
+  ];
+  if (canceled !== undefined) {
+    eq.push({ '@name': 'Canceled', '@value': canceled ? 'true' : 'false' });
+  }
+
   return {
-    '@objecttype': 'TrainAnnouncement',
-    '@schemaversion': '1.9',
-    '@orderby': 'AdvertisedTimeAtLocation',
+    ...trainAnnouncementQueryBase,
     FILTER: {
       AND: {
-        EQ: [
-          { '@name': 'ActivityType', '@value': 'Avgang' },
-          { '@name': 'LocationSignature', '@value': stationId },
-          { '@name': 'Canceled', '@value': canceled },
-        ],
-        OR: {
-          AND: {
-            GT: {
-              '@name': 'AdvertisedTimeAtLocation',
-              '@value': '$dateadd(-23:59:59)',
-            },
-            LT: {
-              '@name': 'AdvertisedTimeAtLocation',
-              '@value': '$dateadd(12:00:00)',
-            },
-          },
-        },
+        EQ: eq,
+        ...advertisedTimeWindow,
       },
     },
     INCLUDE: trainAnnouncementProperties,
@@ -56,24 +73,11 @@ export const getDeparturesFromStationQuery = (
 
 export const getAnnouncementsForTrainQuery = (trainId: string) => {
   return {
-    '@objecttype': 'TrainAnnouncement',
-    '@schemaversion': '1.8',
-    '@orderby': 'AdvertisedTimeAtLocation',
+    ...trainAnnouncementQueryBase,
     FILTER: {
       AND: {
         EQ: [{ '@name': 'AdvertisedTrainIdent', '@value': trainId }],
-        OR: {
-          AND: {
-            GT: {
-              '@name': 'AdvertisedTimeAtLocation',
-              '@value': '$dateadd(-23:59:59)',
-            },
-            LT: {
-              '@name': 'AdvertisedTimeAtLocation',
-              '@value': '$dateadd(12:00:00)',
-            },
-          },
-        },
+        ...advertisedTimeWindow,
       },
     },
     INCLUDE: trainAnnouncementProperties,

@@ -30,8 +30,22 @@ const buildStationDto = (station: Station): StationDto => {
   };
 };
 
+const STATIONS_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
+
+let stationsCache: { stations: StationDto[]; expiresAt: number } | null = null;
+
 export const fetchAllStations = async () => {
+  const now = Date.now();
+  if (stationsCache && now < stationsCache.expiresAt) {
+    return stationsCache.stations;
+  }
+
   const query = getStationsQuery();
   const stations = await client.post<Station[]>(query, 'TrainStation');
-  return stations.map((s) => buildStationDto(s));
+  const stationDtos = stations.map((s) => buildStationDto(s));
+  stationsCache = {
+    stations: stationDtos,
+    expiresAt: now + STATIONS_CACHE_TTL_MS,
+  };
+  return stationDtos;
 };
