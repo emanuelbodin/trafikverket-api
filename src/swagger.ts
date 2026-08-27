@@ -56,6 +56,29 @@ const options: swaggerJsdoc.Options = {
             },
           },
         },
+        OperationalTransportIdentifier: {
+          type: 'object',
+          properties: {
+            objectType: {
+              type: 'string',
+            },
+            company: {
+              type: 'string',
+            },
+            core: {
+              type: 'string',
+            },
+            variant: {
+              type: 'string',
+            },
+            timetableYear: {
+              type: 'number',
+            },
+            startDate: {
+              type: 'string',
+            },
+          },
+        },
         Announcement: {
           type: 'object',
           properties: {
@@ -74,9 +97,17 @@ const options: swaggerJsdoc.Options = {
               type: 'string',
               description: 'Estimated time at location',
             },
+            estimatedTimeIsPreliminary: {
+              type: 'boolean',
+              description: 'Whether the estimated time is preliminary',
+            },
             advertisedTrainIdent: {
               type: 'string',
               description: 'Train identifier',
+            },
+            advertisedTrainReference: {
+              type: 'string',
+              description: 'Advertised train reference',
             },
             toLocation: {
               type: 'array',
@@ -125,6 +156,21 @@ const options: swaggerJsdoc.Options = {
             deviation: {
               $ref: '#/components/schemas/Deviation',
               description: 'Deviation information',
+            },
+            operationalTransportIdentifiers: {
+              type: 'array',
+              items: {
+                $ref: '#/components/schemas/OperationalTransportIdentifier',
+              },
+              description: 'TAF/TAP operational transport identifiers',
+            },
+            plannedEstimatedTimeAtLocation: {
+              type: 'string',
+              description: 'Planned estimated time at location',
+            },
+            plannedEstimatedTimeAtLocationIsValid: {
+              type: 'boolean',
+              description: 'Whether the planned estimated time is valid',
             },
             fromName: {
               type: 'string',

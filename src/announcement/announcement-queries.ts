@@ -3,6 +3,7 @@ const trainAnnouncementProperties = [
   'ActivityType',
   'AdvertisedTimeAtLocation',
   'AdvertisedTrainIdent',
+  'AdvertisedTrainReference',
   'Operator',
   'OtherInformation',
   'TimeAtLocationWithSeconds',
@@ -13,16 +14,21 @@ const trainAnnouncementProperties = [
   'ViaFromLocation',
   'FromLocation',
   'EstimatedTimeAtLocation',
+  'EstimatedTimeIsPreliminary',
   'LocationSignature',
   'Canceled',
   'ProductInformation',
   'ModifiedTime',
   'Deviation',
+  'OperationalTransportIdentifiers',
+  'PlannedEstimatedTimeAtLocation',
+  'PlannedEstimatedTimeAtLocationIsValid',
 ];
 
 const trainAnnouncementQueryBase = {
   '@objecttype': 'TrainAnnouncement',
-  '@schemaversion': '1.9',
+  '@schemaversion': '2.0',
+  '@namespace': 'Rail.TrafficInfo',
   '@orderby': 'AdvertisedTimeAtLocation',
 };
 
