@@ -16,7 +16,7 @@ function getEnvOrUseDefault(env: string, defaultValue: string): string {
 }
 
 const config = {
-  port: getEnvOrUseDefault('SERVER_PORT', '3000'),
+  port: process.env.PORT || getEnvOrUseDefault('SERVER_PORT', '3000'),
   trafikverketApiKey: getEnvOrThrowError('TRAFIKVERKET_API_KEY'),
 };
 
