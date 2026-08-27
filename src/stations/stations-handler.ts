@@ -9,11 +9,13 @@ const router = Router();
  *   get:
  *     tags:
  *       - Stations
- *     summary: Get all train stations
- *     description: Retrieves a list of all train stations in Sweden
+ *     summary: Get advertised train stations
+ *     description: >
+ *       Retrieves TrainStation records where `Advertised` is true.
+ *       This is not an unfiltered dump of every station in the Trafikverket dataset.
  *     responses:
  *       200:
- *         description: Successfully retrieved all stations
+ *         description: Successfully retrieved advertised stations
  *         content:
  *           application/json:
  *             schema:

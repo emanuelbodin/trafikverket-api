@@ -10,7 +10,10 @@ const router = Router();
  *     tags:
  *       - Train
  *     summary: Get train positions
- *     description: Retrieves current positions of all active trains
+ *     description: >
+ *       Retrieves TrainPosition records whose `ModifiedTime` is within the last
+ *       59 seconds. The Trafikverket query uses `@limit=100` and namespace
+ *       `järnväg.trafikinfo`. This is not a complete list of every active train.
  *     responses:
  *       200:
  *         description: Successfully retrieved train positions
