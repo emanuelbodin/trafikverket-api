@@ -38,8 +38,9 @@ const router = Router();
  *         schema:
  *           type: boolean
  *         description: >
- *           Sent to Trafikverket as `Canceled`. `true` means only canceled
- *           departures; any other value (including omit) is sent as not canceled.
+ *           When omitted, the Trafikverket `Canceled` filter is not sent, so both
+ *           canceled and not-canceled departures are returned. `true` returns only
+ *           canceled departures; `false` returns only not-canceled.
  *     responses:
  *       200:
  *         description: Successfully retrieved departures
@@ -58,9 +59,11 @@ router.get('/departures/:from', async (req, res) => {
     delayed?: string;
     canceled?: string;
   };
+  const canceledFilter =
+    canceled === 'true' ? true : canceled === 'false' ? false : undefined;
   const departures = await fetchDeparturesFromStation(
     from,
-    canceled?.toString() === 'true',
+    canceledFilter,
     delayed?.toString() === 'true'
   );
   return res.json(departures);

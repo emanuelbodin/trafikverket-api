@@ -3,7 +3,9 @@ export type Announcement = {
   LocationSignature: string;
   AdvertisedTimeAtLocation: string;
   EstimatedTimeAtLocation: string;
+  EstimatedTimeIsPreliminary: boolean;
   AdvertisedTrainIdent: string;
+  AdvertisedTrainReference: string;
   ToLocation: {
     LocationName: string;
     Priority: number;
@@ -17,6 +19,16 @@ export type Announcement = {
   ProductInformation: { Code: string; Description: string }[];
   ModifiedTime: string;
   Deviation: { Code: string; Description: string };
+  OperationalTransportIdentifiers: {
+    ObjectType: string;
+    Company: string;
+    Core: string;
+    Variant: string;
+    TimetableYear: number;
+    StartDate: string;
+  }[];
+  PlannedEstimatedTimeAtLocation: string;
+  PlannedEstimatedTimeAtLocationIsValid: boolean;
 };
 
 export interface FormattedAnnouncement extends Announcement {
@@ -29,7 +41,9 @@ export type AnnouncementDto = {
   locationSignature: string;
   advertisedTimeAtLocation: string;
   estimatedTimeAtLocation: string;
+  estimatedTimeIsPreliminary: boolean;
   advertisedTrainIdent: string;
+  advertisedTrainReference: string;
   toLocation: {
     locationName: string;
     priority: number;
@@ -43,6 +57,16 @@ export type AnnouncementDto = {
   productInformation: { code: string; description: string }[];
   modifiedTime: string;
   deviation: { code: string; description: string };
+  operationalTransportIdentifiers: {
+    objectType: string;
+    company: string;
+    core: string;
+    variant: string;
+    timetableYear: number;
+    startDate: string;
+  }[];
+  plannedEstimatedTimeAtLocation: string;
+  plannedEstimatedTimeAtLocationIsValid: boolean;
 };
 
 export interface FormattedAnnouncementDto extends AnnouncementDto {
