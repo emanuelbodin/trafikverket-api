@@ -2,14 +2,14 @@
 FROM node:24-alpine AS npm
 WORKDIR /app
 ENV NODE_ENV=production
-COPY package.json package-lock.json ./
-RUN  npm ci
+COPY package.json package-lock.json .npmrc ./
+RUN npm ci
 
 # Builder
 FROM node:24-alpine AS builder
 WORKDIR /app
 COPY ./src ./src
-COPY tsconfig.json package.json package-lock.json ./
+COPY tsconfig.json package.json package-lock.json .npmrc ./
 RUN npm ci
 RUN ./node_modules/.bin/tsc
 
@@ -21,7 +21,7 @@ USER node
 COPY --from=npm /app/node_modules ./node_modules
 COPY --from=builder /app/dist ./
 
-ENV SERVER_PORT=3000
-EXPOSE $PORT
+ENV PORT=3000
+EXPOSE 3000
 
 CMD ["node", "app.js"]

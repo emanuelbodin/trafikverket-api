@@ -4,6 +4,7 @@ import stationsRouter from './stations/stations-handler.js';
 import trainRouter from './train/train-handler.js';
 import announcementRouter from './announcement/announcement-handler.js';
 import { swaggerSpec } from './swagger.js';
+import config from './config.js';
 
 const app = express();
 
@@ -23,6 +24,6 @@ apiRouter.use('/train', trainRouter);
 apiRouter.use('/announcements', announcementRouter);
 app.use('/api', apiRouter);
 
-app.listen(3000, () => {
-  console.info('listening on port 3000');
+app.listen(Number(config.port), '0.0.0.0', () => {
+  console.info(`listening on port ${config.port}`);
 });
