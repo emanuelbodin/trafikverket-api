@@ -107,9 +107,17 @@ export const parseWgs84Point = (
   return { lat, lng };
 };
 
-export const fetchTrainPositions = async () => {
+export const fetchTrainPositions = async (
+  tv: Pick<typeof client, 'postAllPages'> = client
+) => {
   const query = getTrainPositionQuery();
-  const positions = await client.post<TrainPosition[]>(query, 'TrainPosition');
+  const positions = await tv.postAllPages<TrainPosition>(
+    query,
+    'TrainPosition'
+  );
+  if (!Array.isArray(positions)) {
+    throw new Error('Expected TrainPosition array from Trafikverket');
+  }
   return positions.map((p) => buildTrainPositionDto(p));
 };
 

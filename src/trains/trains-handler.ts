@@ -92,8 +92,7 @@ const router = Router();
  *     summary: Get the latest position for one train
  *     description: >
  *       Latest TrainPosition for this advertised train id, filtered at Trafikverket
- *       rather than taking the 100-train dump. Same recency window as
- *       `/api/train/position` (ModifiedTime within the last 59 seconds).
+ *       by advertised train number. ModifiedTime within the last 59 seconds.
  *       `trainId` is AdvertisedTrainIdent, or AdvertisedTrainReference when that
  *       is a unique match. Lat/lng are parsed from WGS84 when possible.
  *     parameters:
