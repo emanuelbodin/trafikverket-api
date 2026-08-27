@@ -13,6 +13,10 @@ const options: swaggerJsdoc.Options = {
         url: 'http://localhost:3000',
         description: 'Development server',
       },
+      {
+        url: 'https://trafikverket-api-production.up.railway.app',
+        description: 'Production (Railway)',
+      },
     ],
     components: {
       schemas: {
