@@ -84,15 +84,24 @@ export const getArrivalsAtStationQuery = (
   canceled?: boolean
 ) => getAnnouncementsAtStationQuery(stationId, 'Ankomst', canceled);
 
-export const getAnnouncementsForTrainQuery = (trainId: string) => {
+const getAnnouncementsForTrainFieldQuery = (
+  fieldName: 'AdvertisedTrainIdent' | 'AdvertisedTrainReference',
+  trainId: string
+) => {
   return {
     ...trainAnnouncementQueryBase,
     FILTER: {
       AND: {
-        EQ: [{ '@name': 'AdvertisedTrainIdent', '@value': trainId }],
+        EQ: [{ '@name': fieldName, '@value': trainId }],
         ...advertisedTimeWindow,
       },
     },
     INCLUDE: trainAnnouncementProperties,
   };
 };
+
+export const getAnnouncementsForTrainQuery = (trainId: string) =>
+  getAnnouncementsForTrainFieldQuery('AdvertisedTrainIdent', trainId);
+
+export const getAnnouncementsForTrainReferenceQuery = (trainId: string) =>
+  getAnnouncementsForTrainFieldQuery('AdvertisedTrainReference', trainId);

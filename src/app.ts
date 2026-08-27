@@ -1,6 +1,7 @@
 import express from 'express';
 import swaggerUi from 'swagger-ui-express';
 import stationsRouter from './stations/stations-handler.js';
+import trainsRouter from './trains/trains-handler.js';
 import trainRouter from './train/train-handler.js';
 import announcementRouter from './announcement/announcement-handler.js';
 import { swaggerSpec } from './swagger.js';
@@ -20,6 +21,7 @@ app.get('/openapi.json', (req, res) => {
 });
 const apiRouter = express.Router();
 apiRouter.use('/stations', stationsRouter);
+apiRouter.use('/trains', trainsRouter);
 apiRouter.use('/train', trainRouter);
 apiRouter.use('/announcements', announcementRouter);
 app.use('/api', apiRouter);
