@@ -3,8 +3,9 @@ import {
   type StationDto,
 } from '../stations/stations-service.js';
 import {
+  getAnnouncementsAtStationQuery,
   getAnnouncementsForTrainQuery,
-  getDeparturesFromStationQuery,
+  type StationActivityType,
 } from './announcement-queries.js';
 import type {
   Announcement,
@@ -95,12 +96,17 @@ export const fetchAnnouncementsForTrain = async (trainId: string) => {
   return getFormattedAnnouncementDtos(announcementDtos, stations);
 };
 
-export const fetchDeparturesFromStation = async (
+export const fetchAnnouncementsAtStation = async (
   stationId: string,
+  activityType: StationActivityType,
   canceled?: boolean,
   delayed: boolean = false
 ) => {
-  const query = getDeparturesFromStationQuery(stationId, canceled);
+  const query = getAnnouncementsAtStationQuery(
+    stationId,
+    activityType,
+    canceled
+  );
   const res = await client.post<Announcement[]>(query, 'TrainAnnouncement');
   const announcementDtos = res.map((a) => buildAnnouncementDto(a));
   const stations = await fetchAllStations();
@@ -112,6 +118,18 @@ export const fetchDeparturesFromStation = async (
 
   return formattedAnnouncements;
 };
+
+export const fetchDeparturesFromStation = (
+  stationId: string,
+  canceled?: boolean,
+  delayed: boolean = false
+) => fetchAnnouncementsAtStation(stationId, 'Avgang', canceled, delayed);
+
+export const fetchArrivalsAtStation = (
+  stationId: string,
+  canceled?: boolean,
+  delayed: boolean = false
+) => fetchAnnouncementsAtStation(stationId, 'Ankomst', canceled, delayed);
 
 const getDelayedAnnouncementDtos = (
   announcements: FormattedAnnouncementDto[]

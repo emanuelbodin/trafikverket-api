@@ -1,5 +1,10 @@
 import client from '../trafikverket/client.js';
 import { getStationsQuery } from './station-queries.js';
+import {
+  filterStations,
+  resolveStationFromList,
+  type StationLookupResult,
+} from './station-lookup.js';
 
 export type Station = {
   AdvertisedLocationName: string;
@@ -48,4 +53,16 @@ export const fetchAllStations = async () => {
     expiresAt: now + STATIONS_CACHE_TTL_MS,
   };
   return stationDtos;
+};
+
+export const searchStations = async (q?: string) => {
+  const stations = await fetchAllStations();
+  return filterStations(stations, q);
+};
+
+export const resolveStation = async (
+  station: string
+): Promise<StationLookupResult<StationDto>> => {
+  const stations = await fetchAllStations();
+  return resolveStationFromList(stations, station);
 };
