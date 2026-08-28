@@ -6,7 +6,7 @@ const options: swaggerJsdoc.Options = {
     info: {
       title: 'Trafikverket API',
       version: '1.0.0',
-      description: 'API for Swedish train information including stations, train positions, and announcements',
+      description: 'API for Swedish train information including stations, train positions, announcements, and disruptions',
     },
     servers: [
       {

@@ -6,6 +6,7 @@ import stationsRouter from './stations/stations-handler.js';
 import trainsRouter from './trains/trains-handler.js';
 import trainRouter, { getTrainPositions } from './train/train-handler.js';
 import announcementRouter from './announcement/announcement-handler.js';
+import disruptionsRouter from './disruptions/disruptions-handler.js';
 import { swaggerSpec } from './swagger.js';
 import config from './config.js';
 
@@ -29,6 +30,7 @@ apiRouter.use('/trains', trainsRouter);
 apiRouter.use('/train', trainRouter);
 apiRouter.get('/positions', getTrainPositions);
 apiRouter.use('/announcements', announcementRouter);
+apiRouter.use('/disruptions', disruptionsRouter);
 app.use('/api', apiRouter);
 
 export const start = () => {
