@@ -109,20 +109,35 @@ const sendLookupError = (
  *                     $ref: '#/components/schemas/StationCandidate'
  *       404:
  *         description: Station not found
+ *       502:
+ *         description: Trafikverket query or paging failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  */
 router.get('', async (req: Request, res: Response) => {
-  const stationParam =
-    typeof req.query.station === 'string' ? req.query.station : undefined;
+  try {
+    const stationParam =
+      typeof req.query.station === 'string' ? req.query.station : undefined;
 
-  let stationSignature: string | undefined;
-  if (stationParam !== undefined) {
-    const result = await resolveStation(stationParam);
-    if (!result.ok) return sendLookupError(res, result);
-    stationSignature = result.station.locationSignature;
+    let stationSignature: string | undefined;
+    if (stationParam !== undefined) {
+      const result = await resolveStation(stationParam);
+      if (!result.ok) return sendLookupError(res, result);
+      stationSignature = result.station.locationSignature;
+    }
+
+    const disruptions = await fetchCurrentDisruptions({ stationSignature });
+    return res.json(disruptions);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : 'Failed to fetch disruptions';
+    console.error(`GET /api/disruptions failed: ${message}`);
+    return res.status(502).json({ error: message });
   }
-
-  const disruptions = await fetchCurrentDisruptions({ stationSignature });
-  return res.json(disruptions);
 });
 
 export default router;

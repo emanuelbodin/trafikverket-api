@@ -178,16 +178,38 @@ describe('etapp 3 disruptions', { concurrency: 1 }, () => {
     assert.equal(third[0].id, 'cached');
   });
 
-  test('TrainMessage query is current-only schema 1.7 without namespace', () => {
+  test('maps top-level AffectedLocation and AffectedTrain after shrinking INCLUDE', () => {
+    const names = new Map([['Cst', 'Stockholm C']]);
+    const dto = buildDisruptionDto(
+      {
+        EventId: 'evt-top',
+        Header: 'Banarbete',
+        AffectedLocation: ['Cst', { LocationSignature: 'U' }],
+        AffectedTrain: '539',
+      },
+      names
+    );
+    assert.equal(dto?.id, 'evt-top');
+    assert.deepEqual(dto?.stations, [
+      { signature: 'Cst', name: 'Stockholm C' },
+      { signature: 'U', name: 'U' },
+    ]);
+    assert.deepEqual(dto?.trains, ['539']);
+  });
+
+  test('TrainMessage query is schema 1.7 without FILTER or full TrafficImpact', () => {
     const xml = stringify({ QUERY: getCurrentTrainMessagesQuery() });
     assert.match(xml, /objecttype="TrainMessage"/);
     assert.match(xml, /schemaversion="1.7"/);
     assert.doesNotMatch(xml, /namespace=/);
-    assert.match(xml, /<EXISTS name="EndDateTime" value="false"\s*\/>/);
-    assert.match(xml, /<GT name="EndDateTime" value="\$now"\s*\/>/);
+    assert.doesNotMatch(xml, /<FILTER>/);
+    assert.doesNotMatch(xml, /\$now/);
+    assert.doesNotMatch(xml, /<INCLUDE>TrafficImpact<\/INCLUDE>/);
     assert.match(xml, /<INCLUDE>EventId<\/INCLUDE>/);
     assert.match(xml, /<INCLUDE>ExternalDescription<\/INCLUDE>/);
-    assert.match(xml, /<INCLUDE>TrafficImpact<\/INCLUDE>/);
+    assert.match(xml, /<INCLUDE>TrafficImpact.AffectedLocation<\/INCLUDE>/);
+    assert.match(xml, /<INCLUDE>AffectedLocation<\/INCLUDE>/);
+    assert.match(xml, /<INCLUDE>AffectedTrain<\/INCLUDE>/);
   });
 
   test('openapi documents GET /api/disruptions', () => {
@@ -332,5 +354,99 @@ describe('etapp 3 disruptions', { concurrency: 1 }, () => {
     const res = await fetch(`http://127.0.0.1:${port}/api/disruptions`);
     assert.equal(res.status, 200);
     assert.deepEqual(await res.json(), []);
+  });
+
+  test('GET /api/disruptions returns JSON 502 when postAllPages throws', async (t) => {
+    const originalFetch = globalThis.fetch;
+    t.after(() => {
+      globalThis.fetch = originalFetch;
+    });
+    globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
+      const target = String(url);
+      if (!target.includes('api.trafikinfo.trafikverket.se')) {
+        return originalFetch(url as RequestInfo, init);
+      }
+      const body = String(init?.body ?? '');
+      if (body.includes('objecttype="TrainStation"')) {
+        return jsonResponse(200, {
+          RESPONSE: { RESULT: [{ TrainStation: [] }] },
+        });
+      }
+      return jsonResponse(200, {
+        RESPONSE: {
+          RESULT: [
+            {
+              ERROR: {
+                SOURCE: 'Request',
+                MESSAGE: 'Invalid filter',
+              },
+            },
+          ],
+        },
+      });
+    }) as typeof fetch;
+
+    const server = app.listen(0);
+    after(() => {
+      server.close();
+    });
+    await new Promise<void>((resolve) => server.on('listening', resolve));
+    const { port } = server.address() as AddressInfo;
+    const res = await fetch(`http://127.0.0.1:${port}/api/disruptions`);
+    assert.equal(res.status, 502);
+    assert.match(res.headers.get('content-type') ?? '', /json/);
+    const body = (await res.json()) as { error: string };
+    assert.equal(typeof body.error, 'string');
+    assert.match(body.error, /Invalid filter/);
+  });
+
+  test('GET /api/disruptions returns 200 JSON when 206 has no LASTCHANGEID', async (t) => {
+    const originalFetch = globalThis.fetch;
+    t.after(() => {
+      globalThis.fetch = originalFetch;
+    });
+    globalThis.fetch = (async (url: unknown, init?: RequestInit) => {
+      const target = String(url);
+      if (!target.includes('api.trafikinfo.trafikverket.se')) {
+        return originalFetch(url as RequestInfo, init);
+      }
+      const body = String(init?.body ?? '');
+      if (body.includes('objecttype="TrainStation"')) {
+        return jsonResponse(200, {
+          RESPONSE: {
+            RESULT: [{ TrainStation: [stationRecord('Cst', 'Stockholm C')] }],
+          },
+        });
+      }
+      return jsonResponse(206, {
+        RESPONSE: {
+          RESULT: [
+            {
+              TrainMessage: [
+                {
+                  EventId: 'partial-page',
+                  Header: 'Signalfel',
+                  AffectedLocation: [{ LocationSignature: 'Cst' }],
+                },
+              ],
+            },
+          ],
+        },
+      });
+    }) as typeof fetch;
+
+    const server = app.listen(0);
+    after(() => {
+      server.close();
+    });
+    await new Promise<void>((resolve) => server.on('listening', resolve));
+    const { port } = server.address() as AddressInfo;
+    const res = await fetch(`http://127.0.0.1:${port}/api/disruptions`);
+    assert.equal(res.status, 200);
+    assert.match(res.headers.get('content-type') ?? '', /json/);
+    const body = (await res.json()) as { id: string; header?: string }[];
+    assert.equal(Array.isArray(body), true);
+    assert.equal(body[0]?.id, 'partial-page');
+    assert.equal(body[0]?.header, 'Signalfel');
   });
 });
