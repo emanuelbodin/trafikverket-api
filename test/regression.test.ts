@@ -5,6 +5,8 @@ import type { AddressInfo } from 'node:net';
 process.env.TRAFIKVERKET_API_KEY ??= 'test-key';
 
 const { fetchTrainPositions } = await import('../src/train/train-service.ts');
+const { getTrainPositionQuery } = await import('../src/train/train-queries.ts');
+const { swaggerSpec } = await import('../src/swagger.ts');
 const { app } = await import('../src/app.ts');
 const { default: client } = await import('../src/trafikverket/client.ts');
 const { stringify } = await import('@libs/xml');
@@ -53,6 +55,116 @@ test('fetchTrainPositions maps a client.post array', async () => {
     (positions as unknown as { TrainPosition?: unknown }).TrainPosition,
     undefined
   );
+  assert.equal('speed' in positions[0], false);
+  assert.equal('bearing' in positions[0], false);
+});
+
+test('bulk TrainPosition query INCLUDEs Speed and Bearing', () => {
+  const include = getTrainPositionQuery().INCLUDE;
+  assert.ok(include.includes('Speed'));
+  assert.ok(include.includes('Bearing'));
+});
+
+test('openapi TrainPositionSnapshot documents optional speed and bearing', () => {
+  const spec = swaggerSpec as {
+    components?: {
+      schemas?: {
+        TrainPositionSnapshot?: {
+          properties?: Record<string, { type?: string }>;
+        };
+      };
+    };
+  };
+  const props = spec.components?.schemas?.TrainPositionSnapshot?.properties;
+  assert.equal(props?.speed?.type, 'number');
+  assert.equal(props?.bearing?.type, 'number');
+  assert.equal(props?.operator?.type, 'string');
+  assert.ok(props?.train);
+  assert.ok(props?.modifiedTime);
+});
+
+test('fetchTrainPositions maps speed when it is a finite number', async () => {
+  const positions = await fetchTrainPositions({
+    postAllPages: async () => [
+      {
+        Train: {
+          OperationalTrainNumber: '12345',
+          OperationalTrainDepartureDate: '2026-08-27',
+          JourneyPlanNumber: '539',
+          JourneyPlanDepartureDate: '2026-08-27',
+          AdvertisedTrainNumber: '539',
+        },
+        Position: { WGS84: 'POINT (18.05 59.33)' },
+        Status: { Active: true },
+        ModifiedTime: '2026-08-27T12:00:00.000Z',
+        Speed: 118,
+      },
+    ],
+  });
+
+  assert.equal(positions[0].speed, 118);
+  assert.equal('bearing' in positions[0], false);
+});
+
+test('fetchTrainPositions omits speed when missing or not a finite number', async () => {
+  const positions = await fetchTrainPositions({
+    postAllPages: async () => [
+      {
+        Train: { AdvertisedTrainNumber: '1' },
+        Position: { WGS84: 'POINT (18.05 59.33)' },
+        Status: { Active: true },
+        ModifiedTime: '2026-08-27T12:00:00.000Z',
+      },
+      {
+        Train: { AdvertisedTrainNumber: '2' },
+        Position: { WGS84: 'POINT (18.05 59.33)' },
+        Status: { Active: true },
+        ModifiedTime: '2026-08-27T12:00:00.000Z',
+        Speed: Number.NaN,
+      },
+      {
+        Train: { AdvertisedTrainNumber: '3' },
+        Position: { WGS84: 'POINT (18.05 59.33)' },
+        Status: { Active: true },
+        ModifiedTime: '2026-08-27T12:00:00.000Z',
+        Speed: Number.POSITIVE_INFINITY,
+      },
+    ],
+  });
+
+  assert.equal(positions.length, 3);
+  for (const position of positions) {
+    assert.equal('speed' in position, false);
+    assert.equal(position.speed, undefined);
+  }
+});
+
+test('fetchTrainPositions maps bearing only when present as a finite number', async () => {
+  const positions = await fetchTrainPositions({
+    postAllPages: async () => [
+      {
+        Train: { AdvertisedTrainNumber: '539' },
+        Position: { WGS84: 'POINT (18.05 59.33)' },
+        Status: { Active: true },
+        ModifiedTime: '2026-08-27T12:00:00.000Z',
+        Speed: 0,
+        Bearing: 137.5,
+      },
+      {
+        Train: { AdvertisedTrainNumber: '540' },
+        Position: { WGS84: 'POINT (18.06 59.34)' },
+        Status: { Active: true },
+        ModifiedTime: '2026-08-27T12:00:01.000Z',
+        Speed: 90,
+      },
+    ],
+  });
+
+  assert.equal(positions[0].speed, 0);
+  assert.equal(positions[0].bearing, 137.5);
+  assert.equal(positions[1].speed, 90);
+  assert.equal('bearing' in positions[1], false);
+  assert.equal(positions[1].bearing, undefined);
 });
 
 test('CORS headers are present on GET and OPTIONS preflight', async () => {
@@ -228,7 +340,10 @@ test('fetchTrainPositions joins operator onto the DTO by advertised train number
   const positions = await fetchTrainPositions({
     postAllPages: async (_query, entityName) => {
       if (entityName === 'TrainPosition') {
-        return [snapshotPosition('539'), snapshotPosition('540')];
+        return [
+          { ...snapshotPosition('539'), Speed: 118, Bearing: 45 },
+          snapshotPosition('540'),
+        ];
       }
       assert.equal(entityName, 'TrainAnnouncement');
       return [
@@ -240,7 +355,11 @@ test('fetchTrainPositions joins operator onto the DTO by advertised train number
 
   assert.equal(positions.length, 2);
   assert.equal(positions[0].operator, 'SJ');
+  assert.equal(positions[0].speed, 118);
+  assert.equal(positions[0].bearing, 45);
   assert.equal(positions[1].operator, 'ARRIVA');
+  assert.equal('speed' in positions[1], false);
+  assert.equal('bearing' in positions[1], false);
   assert.equal(positions[0].train.advertisedTrainNumber, '539');
   assert.equal(
     (positions[0].train as { operator?: string }).operator,

@@ -33,6 +33,7 @@ export type TrainLivePosition = {
   lat?: number;
   lng?: number;
   speed?: number;
+  bearing?: number;
   active?: boolean;
   modifiedTime?: string;
 };
@@ -112,6 +113,7 @@ export const fetchTrainLivePosition = async (trainId: string) => {
     position.lng = parsed.lng;
   }
   if (record.speed !== undefined) position.speed = record.speed;
+  if (record.bearing !== undefined) position.bearing = record.bearing;
   if (record.active !== undefined) position.active = record.active;
   if (record.modifiedTime) position.modifiedTime = record.modifiedTime;
   return position;
