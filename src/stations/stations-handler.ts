@@ -1,4 +1,5 @@
 import { Router, type Response } from 'express';
+import { parseAdvertisedTimeWindow } from '../announcement/advertised-time-window.js';
 import {
   fetchArrivalsAtStation,
   fetchDeparturesFromStation,
@@ -100,9 +101,10 @@ router.get('', async (req, res) => {
  *       - Stations
  *     summary: Get departures from a station
  *     description: >
- *       Departures from the given station (name or signature). Same time window
- *       as the legacy announcements route: about 24 hours back and 12 hours ahead.
- *       `canceled` and `delayed` behave as they do on that route.
+ *       Departures from the given station (name or signature). Optional `from`
+ *       and `to` filter `AdvertisedTimeAtLocation` (`GT` / `LT`). When both are
+ *       omitted, no advertised-time filter is applied. `canceled` and `delayed`
+ *       behave as they do on the legacy announcements route.
  *     parameters:
  *       - in: path
  *         name: station
@@ -112,6 +114,8 @@ router.get('', async (req, res) => {
  *         description: >
  *           Station signature (`U`, `Cst`) or name (`Uppsala`, `Stockholm C`).
  *           URL-encoded names are accepted (e.g. Gävle).
+ *       - $ref: '#/components/parameters/AdvertisedTimeFrom'
+ *       - $ref: '#/components/parameters/AdvertisedTimeTo'
  *       - in: query
  *         name: delayed
  *         schema:
@@ -137,7 +141,7 @@ router.get('', async (req, res) => {
  *               items:
  *                 $ref: '#/components/schemas/Announcement'
  *       400:
- *         description: Station name is ambiguous
+ *         description: Station name is ambiguous, or `from`/`to` is invalid
  *         content:
  *           application/json:
  *             schema:
@@ -151,18 +155,40 @@ router.get('', async (req, res) => {
  *                     $ref: '#/components/schemas/StationCandidate'
  *       404:
  *         description: Station not found
+ *       502:
+ *         description: Trafikverket query or paging failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  */
 router.get('/:station/departures', async (req, res) => {
-  const result = await resolveStation(req.params.station);
-  if (!result.ok) return sendLookupError(res, result);
+  const windowResult = parseAdvertisedTimeWindow(req.query);
+  if (!windowResult.ok) {
+    return res.status(400).json({ error: windowResult.error });
+  }
 
-  const { delayed, canceled } = req.query;
-  const departures = await fetchDeparturesFromStation(
-    result.station.locationSignature,
-    parseCanceledFilter(canceled),
-    delayed === 'true'
-  );
-  return res.json(departures);
+  try {
+    const result = await resolveStation(req.params.station);
+    if (!result.ok) return sendLookupError(res, result);
+
+    const { delayed, canceled } = req.query;
+    const departures = await fetchDeparturesFromStation(
+      result.station.locationSignature,
+      parseCanceledFilter(canceled),
+      delayed === 'true',
+      windowResult.window
+    );
+    return res.json(departures);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : 'Failed to fetch departures';
+    console.error(`GET /api/stations/:station/departures failed: ${message}`);
+    return res.status(502).json({ error: message });
+  }
 });
 
 /**
@@ -173,8 +199,8 @@ router.get('/:station/departures', async (req, res) => {
  *       - Stations
  *     summary: Get arrivals at a station
  *     description: >
- *       Arrivals at the given station (name or signature). Same time window,
- *       canceled, and delayed behavior as departures.
+ *       Arrivals at the given station (name or signature). Optional `from` and
+ *       `to`, `canceled`, and `delayed` behave as they do on departures.
  *     parameters:
  *       - in: path
  *         name: station
@@ -184,6 +210,8 @@ router.get('/:station/departures', async (req, res) => {
  *         description: >
  *           Station signature (`U`, `Cst`) or name (`Uppsala`, `Stockholm C`).
  *           URL-encoded names are accepted (e.g. Gävle).
+ *       - $ref: '#/components/parameters/AdvertisedTimeFrom'
+ *       - $ref: '#/components/parameters/AdvertisedTimeTo'
  *       - in: query
  *         name: delayed
  *         schema:
@@ -209,7 +237,7 @@ router.get('/:station/departures', async (req, res) => {
  *               items:
  *                 $ref: '#/components/schemas/Announcement'
  *       400:
- *         description: Station name is ambiguous
+ *         description: Station name is ambiguous, or `from`/`to` is invalid
  *         content:
  *           application/json:
  *             schema:
@@ -223,18 +251,40 @@ router.get('/:station/departures', async (req, res) => {
  *                     $ref: '#/components/schemas/StationCandidate'
  *       404:
  *         description: Station not found
+ *       502:
+ *         description: Trafikverket query or paging failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  */
 router.get('/:station/arrivals', async (req, res) => {
-  const result = await resolveStation(req.params.station);
-  if (!result.ok) return sendLookupError(res, result);
+  const windowResult = parseAdvertisedTimeWindow(req.query);
+  if (!windowResult.ok) {
+    return res.status(400).json({ error: windowResult.error });
+  }
 
-  const { delayed, canceled } = req.query;
-  const arrivals = await fetchArrivalsAtStation(
-    result.station.locationSignature,
-    parseCanceledFilter(canceled),
-    delayed === 'true'
-  );
-  return res.json(arrivals);
+  try {
+    const result = await resolveStation(req.params.station);
+    if (!result.ok) return sendLookupError(res, result);
+
+    const { delayed, canceled } = req.query;
+    const arrivals = await fetchArrivalsAtStation(
+      result.station.locationSignature,
+      parseCanceledFilter(canceled),
+      delayed === 'true',
+      windowResult.window
+    );
+    return res.json(arrivals);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : 'Failed to fetch arrivals';
+    console.error(`GET /api/stations/:station/arrivals failed: ${message}`);
+    return res.status(502).json({ error: message });
+  }
 });
 
 /**

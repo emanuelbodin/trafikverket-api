@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { parseAdvertisedTimeWindow } from './advertised-time-window.js';
 import {
   fetchAnnouncementsForTrain,
   fetchDeparturesFromStation,
@@ -15,9 +16,10 @@ const router = Router();
  *     summary: Get departures from a station
  *     description: >
  *       Retrieves departure announcements (`ActivityType=Avgang`) for a station.
- *       Only announcements whose advertised time is between about 24 hours ago
- *       and 12 hours ahead are included. Station names (`fromName`, `toName`)
- *       are resolved from the stations list. Always returns JSON.
+ *       Optional `from` and `to` query params filter `AdvertisedTimeAtLocation`
+ *       (`GT` / `LT`). When both are omitted, no advertised-time filter is applied.
+ *       Station names (`fromName`, `toName`) are resolved from the stations list.
+ *       Always returns JSON.
  *     parameters:
  *       - in: path
  *         name: from
@@ -25,6 +27,8 @@ const router = Router();
  *         schema:
  *           type: string
  *         description: Station LocationSignature (e.g. Cst), not the station display name
+ *       - $ref: '#/components/parameters/AdvertisedTimeFrom'
+ *       - $ref: '#/components/parameters/AdvertisedTimeTo'
  *       - in: query
  *         name: delayed
  *         schema:
@@ -50,10 +54,31 @@ const router = Router();
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/Announcement'
- *       500:
- *         description: Failed to fetch departures
+ *       400:
+ *         description: Invalid `from` or `to` timestamp, or `from` after `to`
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *       502:
+ *         description: Trafikverket query or paging failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  */
 router.get('/departures/:from', async (req, res) => {
+  const windowResult = parseAdvertisedTimeWindow(req.query);
+  if (!windowResult.ok) {
+    return res.status(400).json({ error: windowResult.error });
+  }
+
   const from = req.params.from;
   const { delayed, canceled } = req.query as {
     delayed?: string;
@@ -61,12 +86,20 @@ router.get('/departures/:from', async (req, res) => {
   };
   const canceledFilter =
     canceled === 'true' ? true : canceled === 'false' ? false : undefined;
-  const departures = await fetchDeparturesFromStation(
-    from,
-    canceledFilter,
-    delayed?.toString() === 'true'
-  );
-  return res.json(departures);
+  try {
+    const departures = await fetchDeparturesFromStation(
+      from,
+      canceledFilter,
+      delayed?.toString() === 'true',
+      windowResult.window
+    );
+    return res.json(departures);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : 'Failed to fetch departures';
+    console.error(`GET /api/announcements/departures/:from failed: ${message}`);
+    return res.status(502).json({ error: message });
+  }
 });
 
 /**
@@ -77,8 +110,9 @@ router.get('/departures/:from', async (req, res) => {
  *       - Announcements
  *     summary: Get announcements for a specific train
  *     description: >
- *       Retrieves TrainAnnouncement records for `AdvertisedTrainIdent`, with
- *       advertised time between about 24 hours ago and 12 hours ahead.
+ *       Retrieves TrainAnnouncement records for `AdvertisedTrainIdent`.
+ *       Optional `from` and `to` query params filter `AdvertisedTimeAtLocation`
+ *       (`GT` / `LT`). When both are omitted, no advertised-time filter is applied.
  *       Station names (`fromName`, `toName`) are resolved from the stations list.
  *     parameters:
  *       - in: path
@@ -87,6 +121,8 @@ router.get('/departures/:from', async (req, res) => {
  *         schema:
  *           type: string
  *         description: Advertised train identifier (`AdvertisedTrainIdent`)
+ *       - $ref: '#/components/parameters/AdvertisedTimeFrom'
+ *       - $ref: '#/components/parameters/AdvertisedTimeTo'
  *     responses:
  *       200:
  *         description: Successfully retrieved train announcements
@@ -96,13 +132,44 @@ router.get('/departures/:from', async (req, res) => {
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/Announcement'
- *       500:
- *         description: Failed to fetch announcements
+ *       400:
+ *         description: Invalid `from` or `to` timestamp, or `from` after `to`
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
+ *       502:
+ *         description: Trafikverket query or paging failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  */
 router.get('/train/:trainId', async (req, res) => {
+  const windowResult = parseAdvertisedTimeWindow(req.query);
+  if (!windowResult.ok) {
+    return res.status(400).json({ error: windowResult.error });
+  }
+
   const { trainId } = req.params;
-  const departures = await fetchAnnouncementsForTrain(trainId);
-  return res.json(departures);
+  try {
+    const departures = await fetchAnnouncementsForTrain(
+      trainId,
+      windowResult.window
+    );
+    return res.json(departures);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : 'Failed to fetch announcements';
+    console.error(`GET /api/announcements/train/:trainId failed: ${message}`);
+    return res.status(502).json({ error: message });
+  }
 });
 
 export default router;

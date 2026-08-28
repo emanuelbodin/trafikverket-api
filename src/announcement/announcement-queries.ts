@@ -1,3 +1,5 @@
+import type { AdvertisedTimeWindow } from './advertised-time-window.js';
+
 const trainAnnouncementProperties = [
   'ActivityId',
   'ActivityType',
@@ -32,27 +34,42 @@ const trainAnnouncementQueryBase = {
   '@orderby': 'AdvertisedTimeAtLocation',
 };
 
-const advertisedTimeWindow = {
-  OR: {
-    AND: {
-      GT: {
-        '@name': 'AdvertisedTimeAtLocation',
-        '@value': '$dateadd(-23:59:59)',
-      },
-      LT: {
-        '@name': 'AdvertisedTimeAtLocation',
-        '@value': '$dateadd(12:00:00)',
-      },
-    },
-  },
+const advertisedTimeBounds = (window?: AdvertisedTimeWindow) => {
+  const bounds: {
+    GT?: { '@name': string; '@value': string };
+    LT?: { '@name': string; '@value': string };
+  } = {};
+  if (window?.from) {
+    bounds.GT = {
+      '@name': 'AdvertisedTimeAtLocation',
+      '@value': window.from,
+    };
+  }
+  if (window?.to) {
+    bounds.LT = {
+      '@name': 'AdvertisedTimeAtLocation',
+      '@value': window.to,
+    };
+  }
+  return bounds;
 };
+
+/**
+ * Internal snapshot join only — not a client-specified window.
+ * Keeps the operator map from requesting all historical announcements.
+ */
+const internalAdvertisedTimeWindow = advertisedTimeBounds({
+  from: '$dateadd(-23:59:59)',
+  to: '$dateadd(12:00:00)',
+});
 
 export type StationActivityType = 'Avgang' | 'Ankomst';
 
 export const getAnnouncementsAtStationQuery = (
   stationId: string,
   activityType: StationActivityType,
-  canceled?: boolean
+  canceled?: boolean,
+  window?: AdvertisedTimeWindow
 ) => {
   const eq: { '@name': string; '@value': string }[] = [
     { '@name': 'ActivityType', '@value': activityType },
@@ -67,7 +84,7 @@ export const getAnnouncementsAtStationQuery = (
     FILTER: {
       AND: {
         EQ: eq,
-        ...advertisedTimeWindow,
+        ...advertisedTimeBounds(window),
       },
     },
     INCLUDE: trainAnnouncementProperties,
@@ -76,35 +93,47 @@ export const getAnnouncementsAtStationQuery = (
 
 export const getDeparturesFromStationQuery = (
   stationId: string,
-  canceled?: boolean
-) => getAnnouncementsAtStationQuery(stationId, 'Avgang', canceled);
+  canceled?: boolean,
+  window?: AdvertisedTimeWindow
+) => getAnnouncementsAtStationQuery(stationId, 'Avgang', canceled, window);
 
 export const getArrivalsAtStationQuery = (
   stationId: string,
-  canceled?: boolean
-) => getAnnouncementsAtStationQuery(stationId, 'Ankomst', canceled);
+  canceled?: boolean,
+  window?: AdvertisedTimeWindow
+) => getAnnouncementsAtStationQuery(stationId, 'Ankomst', canceled, window);
 
 const getAnnouncementsForTrainFieldQuery = (
   fieldName: 'AdvertisedTrainIdent' | 'AdvertisedTrainReference',
-  trainId: string
+  trainId: string,
+  window?: AdvertisedTimeWindow
 ) => {
   return {
     ...trainAnnouncementQueryBase,
     FILTER: {
       AND: {
         EQ: [{ '@name': fieldName, '@value': trainId }],
-        ...advertisedTimeWindow,
+        ...advertisedTimeBounds(window),
       },
     },
     INCLUDE: trainAnnouncementProperties,
   };
 };
 
-export const getAnnouncementsForTrainQuery = (trainId: string) =>
-  getAnnouncementsForTrainFieldQuery('AdvertisedTrainIdent', trainId);
+export const getAnnouncementsForTrainQuery = (
+  trainId: string,
+  window?: AdvertisedTimeWindow
+) => getAnnouncementsForTrainFieldQuery('AdvertisedTrainIdent', trainId, window);
 
-export const getAnnouncementsForTrainReferenceQuery = (trainId: string) =>
-  getAnnouncementsForTrainFieldQuery('AdvertisedTrainReference', trainId);
+export const getAnnouncementsForTrainReferenceQuery = (
+  trainId: string,
+  window?: AdvertisedTimeWindow
+) =>
+  getAnnouncementsForTrainFieldQuery(
+    'AdvertisedTrainReference',
+    trainId,
+    window
+  );
 
 /** Max AdvertisedTrainIdent values per Trafikverket IN filter (XML length). */
 export const TRAIN_IDENT_IN_BATCH_SIZE = 100;
@@ -129,7 +158,7 @@ export const getAnnouncementsForTrainIdentsQuery = (trainIds: string[]) => {
           '@name': 'AdvertisedTrainIdent',
           '@value': trainIds.join(','),
         },
-        ...advertisedTimeWindow,
+        ...internalAdvertisedTimeWindow,
       },
     },
     INCLUDE: journeyMetaInclude,

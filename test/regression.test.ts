@@ -339,6 +339,8 @@ test('bulk announcement query uses Trafikverket IN on AdvertisedTrainIdent', () 
   assert.match(xml, /objecttype="TrainAnnouncement"/);
   assert.match(xml, /schemaversion="2.0"/);
   assert.match(xml, /namespace="Rail.TrafficInfo"/);
+  assert.match(xml, /\$dateadd\(-23:59:59\)/);
+  assert.match(xml, /\$dateadd\(12:00:00\)/);
 });
 
 test('buildJourneyMetaMap takes first non-empty Operator per train', () => {

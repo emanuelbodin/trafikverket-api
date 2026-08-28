@@ -1,4 +1,5 @@
 import { Router } from 'express';
+import { parseAdvertisedTimeWindow } from '../announcement/advertised-time-window.js';
 import { fetchTrainJourney, fetchTrainLivePosition } from './trains-service.js';
 
 const router = Router();
@@ -132,8 +133,9 @@ router.get('/:trainId/position', async (req, res) => {
  *       - Trains
  *     summary: Get one train as a list of stops
  *     description: >
- *       Journey for this advertised train id, built from TrainAnnouncement 2.0
- *       (same time window as `/api/announcements/train/{trainId}`). `trainId` is
+ *       Journey for this advertised train id, built from TrainAnnouncement 2.0.
+ *       Optional `from` and `to` filter `AdvertisedTimeAtLocation` (`GT` / `LT`);
+ *       when both are omitted, no advertised-time filter is applied. `trainId` is
  *       AdvertisedTrainIdent, or AdvertisedTrainReference when that is a unique
  *       match. Each stop includes station names (`fromName`, `toName`), advertised
  *       vs estimated time, canceled/delayed flags, and a readable `reason` from
@@ -145,6 +147,8 @@ router.get('/:trainId/position', async (req, res) => {
  *         schema:
  *           type: string
  *         description: Advertised train id, or a unique advertised train reference
+ *       - $ref: '#/components/parameters/AdvertisedTimeFrom'
+ *       - $ref: '#/components/parameters/AdvertisedTimeTo'
  *     responses:
  *       200:
  *         description: The train journey
@@ -152,16 +156,46 @@ router.get('/:trainId/position', async (req, res) => {
  *           application/json:
  *             schema:
  *               $ref: '#/components/schemas/TrainJourney'
+ *       400:
+ *         description: Invalid `from` or `to` timestamp, or `from` after `to`
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  *       404:
  *         description: No announcements for this train
+ *       502:
+ *         description: Trafikverket query or paging failed
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  */
 router.get('/:trainId', async (req, res) => {
-  const { trainId } = req.params;
-  const journey = await fetchTrainJourney(trainId);
-  if (!journey) {
-    return res.status(404).json({ error: 'Train not found' });
+  const windowResult = parseAdvertisedTimeWindow(req.query);
+  if (!windowResult.ok) {
+    return res.status(400).json({ error: windowResult.error });
   }
-  return res.json(journey);
+
+  const { trainId } = req.params;
+  try {
+    const journey = await fetchTrainJourney(trainId, windowResult.window);
+    if (!journey) {
+      return res.status(404).json({ error: 'Train not found' });
+    }
+    return res.json(journey);
+  } catch (err) {
+    const message =
+      err instanceof Error ? err.message : 'Failed to fetch train journey';
+    console.error(`GET /api/trains/:trainId failed: ${message}`);
+    return res.status(502).json({ error: message });
+  }
 });
 
 export default router;

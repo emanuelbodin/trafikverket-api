@@ -50,11 +50,14 @@ HTTP surface:
 - `GET /api-docs` — Swagger UI
 - `GET /openapi.json`
 - `GET /api/stations`
+- `GET /api/stations/:station/departures` — query: `from`, `to`, `canceled`, `delayed`
+- `GET /api/stations/:station/arrivals` — query: `from`, `to`, `canceled`, `delayed`
+- `GET /api/trains/:trainId` — query: `from`, `to`
 - `GET /api/train/position`
-- `GET /api/announcements/departures/:from` — query: `canceled`, `delayed` (`true` as string)
-- `GET /api/announcements/train/:trainId`
+- `GET /api/announcements/departures/:from` — query: `from`, `to`, `canceled`, `delayed`
+- `GET /api/announcements/train/:trainId` — query: `from`, `to`
 
-`:from` is a Trafikverket **location signature** (e.g. `Cst`), not a display name.
+`:from` on the legacy announcements route is a Trafikverket **location signature** (e.g. `Cst`), not a display name. Query `from`/`to` are ISO-8601 advertised-time bounds.
 
 ## Conventions
 
@@ -63,13 +66,14 @@ HTTP surface:
 - Keep Trafikverket wire types PascalCase; public JSON is camelCase DTOs via `build*Dto` helpers.
 - Document new/changed routes with `@openapi` JSDoc on the handler. Shared schemas live in `src/swagger.ts`. After route changes, confirm `/openapi.json` still matches.
 - Query objects use `@attribute` keys (`@objecttype`, `@name`, `@value`) because they are serialized to XML.
-- TrainAnnouncement time window is last ~24h through next 12h (`$dateadd`).
+- TrainAnnouncement list queries have no default advertised-time window. Optional `from`/`to` query params become `GT`/`LT` on `AdvertisedTimeAtLocation`. The bulk operator join (`getAnnouncementsForTrainIdentsQuery`) keeps an internal ~24h/12h `$dateadd` bound. Invalid timestamps return JSON 400 `{ error }`.
 - Prefer `async` route handlers and `res.json(...)`. Do not add a framework or ORM.
 
 ## When changing Trafikverket queries
 
 - Match `@schemaversion` to the object type already used in that query file unless you are intentionally upgrading.
 - `client.post` second argument must be the JSON entity key (`TrainStation`, `TrainPosition`, `TrainAnnouncement`).
+- List announcement fetches use `client.postAllPages` (HTTP 206 pages). Failures are JSON 502 `{ error }`.
 - `INCLUDE` only fields the DTO actually maps.
 - Station lookups for `fromName`/`toName` call `fetchAllStations()` per request; do not add caching unless asked.
 
