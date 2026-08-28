@@ -23,6 +23,8 @@ type TrainPosition = {
     Active?: boolean;
   };
   Speed?: number;
+  /** Absolute direction in degrees (TrainPosition 1.1). */
+  Bearing?: number;
   ModifiedTime?: string;
 };
 
@@ -41,6 +43,8 @@ export type TrainPositionDto = {
     active: boolean;
   };
   modifiedTime: string;
+  speed?: number;
+  bearing?: number;
   operator?: string;
   fromName?: string;
   toName?: string;
@@ -50,9 +54,13 @@ export type TrainPositionRecord = {
   advertisedTrainNumber?: string;
   wgs84?: string;
   speed?: number;
+  bearing?: number;
   active?: boolean;
   modifiedTime?: string;
 };
+
+const finiteNumber = (value: unknown): number | undefined =>
+  typeof value === 'number' && Number.isFinite(value) ? value : undefined;
 
 const buildTrainPositionDto = (
   position: TrainPosition,
@@ -75,6 +83,10 @@ const buildTrainPositionDto = (
     },
     modifiedTime: position.ModifiedTime ?? '',
   };
+  const speed = finiteNumber(position.Speed);
+  const bearing = finiteNumber(position.Bearing);
+  if (speed !== undefined) dto.speed = speed;
+  if (bearing !== undefined) dto.bearing = bearing;
   if (meta?.operator) dto.operator = meta.operator;
   if (meta?.fromName) dto.fromName = meta.fromName;
   if (meta?.toName) dto.toName = meta.toName;
@@ -84,14 +96,13 @@ const buildTrainPositionDto = (
 const toTrainPositionRecord = (
   position: TrainPosition
 ): TrainPositionRecord => {
-  const speed =
-    typeof position.Speed === 'number' && Number.isFinite(position.Speed)
-      ? position.Speed
-      : undefined;
+  const speed = finiteNumber(position.Speed);
+  const bearing = finiteNumber(position.Bearing);
   return {
     advertisedTrainNumber: position.Train?.AdvertisedTrainNumber,
     wgs84: position.Position?.WGS84,
     speed,
+    bearing,
     active: position.Status?.Active,
     modifiedTime: position.ModifiedTime,
   };

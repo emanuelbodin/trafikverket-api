@@ -6,7 +6,14 @@ export const getTrainPositionQuery = () => {
     FILTER: {
       EQ: [{ '@name': 'Status.Active', '@value': 'true' }],
     },
-    INCLUDE: ['ModifiedTime', 'Speed', 'Position.WGS84', 'Status', 'Train'],
+    INCLUDE: [
+      'ModifiedTime',
+      'Speed',
+      'Bearing',
+      'Position.WGS84',
+      'Status',
+      'Train',
+    ],
   };
 };
 
@@ -24,6 +31,13 @@ export const getTrainPositionForTrainQuery = (trainId: string) => {
         },
       },
     },
-    INCLUDE: ['ModifiedTime', 'Speed', 'Position.WGS84', 'Status', 'Train'],
+    INCLUDE: [
+      'ModifiedTime',
+      'Speed',
+      'Bearing',
+      'Position.WGS84',
+      'Status',
+      'Train',
+    ],
   };
 };

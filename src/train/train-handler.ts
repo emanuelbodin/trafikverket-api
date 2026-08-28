@@ -43,6 +43,15 @@ const router = Router();
  *         modifiedTime:
  *           type: string
  *           description: Last modified timestamp
+ *         speed:
+ *           type: number
+ *           description: >
+ *             Speed in km/h from TrainPosition.Speed, when a finite number
+ *         bearing:
+ *           type: number
+ *           description: >
+ *             Absolute direction in degrees from TrainPosition.Bearing, when
+ *             a finite number. Not derived from WGS84.
  *         operator:
  *           type: string
  *           description: >

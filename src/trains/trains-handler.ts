@@ -75,6 +75,9 @@ const router = Router();
  *         speed:
  *           type: number
  *           description: Speed from TrainPosition, when present
+ *         bearing:
+ *           type: number
+ *           description: Absolute direction in degrees from TrainPosition.Bearing, when present
  *         active:
  *           type: boolean
  *           description: Whether the train is currently active
