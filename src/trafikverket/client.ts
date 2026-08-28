@@ -11,12 +11,13 @@ type TrafikverketError = {
 };
 
 type TrafikverketInfo = {
-  LASTCHANGEID?: string;
+  LASTCHANGEID?: string | number;
+  LastChangeId?: string | number;
 };
 
 type TrafikverketResult = {
   ERROR?: TrafikverketError;
-  INFO?: TrafikverketInfo;
+  INFO?: TrafikverketInfo | TrafikverketInfo[];
 } & Record<string, unknown>;
 
 type TrafikverketResponse = {
@@ -29,6 +30,21 @@ export type QueryPage<T> = {
   items: T;
   lastChangeId?: string;
   truncated: boolean;
+};
+
+export type PostAllPagesOptions = {
+  /** HTTP 206 with no new LASTCHANGEID: throw (default) or return pages so far. */
+  onMissingChangeId?: 'throw' | 'return';
+};
+
+const lastChangeIdOf = (result: TrafikverketResult): string | undefined => {
+  const info = result.INFO;
+  const rec = Array.isArray(info) ? info[0] : info;
+  if (!rec || typeof rec !== 'object') return undefined;
+  const raw = rec.LASTCHANGEID ?? rec.LastChangeId;
+  const value = Array.isArray(raw) ? raw[0] : raw;
+  if (value == null || value === '') return undefined;
+  return String(value);
 };
 
 const parseResult = <T>(
@@ -44,14 +60,19 @@ const parseResult = <T>(
   if (result.ERROR) {
     const source = result.ERROR.SOURCE ?? 'unknown';
     const message = result.ERROR.MESSAGE ?? 'unknown error';
-    throw new Error(`Trafikverket error (${source}): ${message}`);
+    // 206 is a page, not a hard error — Trafikverket may still send ERROR
+    // ("response too large") alongside INFO.LASTCHANGEID and a partial list.
+    if (!truncated) {
+      throw new Error(`Trafikverket error (${source}): ${message}`);
+    }
+    console.error(`Trafikverket HTTP 206 ERROR (${source}): ${message}`);
   }
 
   // Empty result sets omit the entity key entirely rather than sending [].
   const dataToReturn = result[entityName];
   return {
     items: (dataToReturn == null ? [] : dataToReturn) as T,
-    lastChangeId: result.INFO?.LASTCHANGEID,
+    lastChangeId: lastChangeIdOf(result),
     truncated,
   };
 };
@@ -106,7 +127,8 @@ const post = async <T>(
 /** Collect every page of a snapshot. HTTP 206 continues with INFO.LASTCHANGEID. */
 const postAllPages = async <T>(
   query: stringifyable,
-  entityName: string
+  entityName: string,
+  options: PostAllPagesOptions = {}
 ): Promise<T[]> => {
   let changeId = '0';
   const items: T[] = [];
@@ -130,6 +152,9 @@ const postAllPages = async <T>(
 
     const nextId = result.lastChangeId;
     if (!nextId || nextId === changeId) {
+      if (options.onMissingChangeId === 'return') {
+        return items;
+      }
       throw new Error(
         'Trafikverket HTTP 206 without a new INFO.LASTCHANGEID'
       );

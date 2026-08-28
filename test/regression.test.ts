@@ -248,6 +248,53 @@ test('postAllPages continues on HTTP 206 using INFO.LASTCHANGEID', async (t) => 
   assert.match(String(bodies[1]), /changeid="10"/);
 });
 
+test('postAllPages continues on HTTP 206 even when RESULT.ERROR is set', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const bodies: unknown[] = [];
+  globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+    bodies.push(init?.body);
+    if (bodies.length === 1) {
+      return jsonResponse(206, {
+        RESPONSE: {
+          RESULT: [
+            {
+              ERROR: {
+                SOURCE: 'Request',
+                MESSAGE: 'The response is too large',
+              },
+              TrainPosition: [{ id: 'a' }],
+              INFO: { LASTCHANGEID: '10' },
+            },
+          ],
+        },
+      });
+    }
+    return jsonResponse(200, {
+      RESPONSE: {
+        RESULT: [
+          {
+            TrainPosition: [{ id: 'b' }],
+            INFO: { LASTCHANGEID: '20' },
+          },
+        ],
+      },
+    });
+  }) as typeof fetch;
+
+  const items = await client.postAllPages<{ id: string }>(
+    { '@objecttype': 'TrainPosition' },
+    'TrainPosition'
+  );
+
+  assert.deepEqual(items, [{ id: 'a' }, { id: 'b' }]);
+  assert.equal(bodies.length, 2);
+  assert.match(String(bodies[1]), /changeid="10"/);
+});
+
 test('postAllPages treats omitted entity key as empty/done', async (t) => {
   const originalFetch = globalThis.fetch;
   t.after(() => {

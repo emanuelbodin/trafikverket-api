@@ -245,7 +245,8 @@ const loadMessages = async (
 
   const rows = await tv.postAllPages<TrainMessage>(
     getCurrentTrainMessagesQuery(),
-    'TrainMessage'
+    'TrainMessage',
+    { onMissingChangeId: 'return' }
   );
   const messages = Array.isArray(rows) ? rows : [];
   disruptionsCache = {
