@@ -7,6 +7,14 @@ process.env.TRAFIKVERKET_API_KEY ??= 'test-key';
 const { fetchTrainPositions } = await import('../src/train/train-service.ts');
 const { app } = await import('../src/app.ts');
 const { default: client } = await import('../src/trafikverket/client.ts');
+const { stringify } = await import('@libs/xml');
+const {
+  getAnnouncementsForTrainIdentsQuery,
+  TRAIN_IDENT_IN_BATCH_SIZE,
+} = await import('../src/announcement/announcement-queries.ts');
+const { buildJourneyMetaMap } = await import(
+  '../src/announcement/announcement-service.ts'
+);
 
 describe('etapp 2 regression', { concurrency: 1 }, () => {
 
@@ -145,6 +153,156 @@ test('postAllPages treats omitted entity key as empty/done', async (t) => {
     'TrainPosition'
   );
   assert.deepEqual(items, []);
+});
+
+const snapshotPosition = (advertisedTrainNumber: string) => ({
+  Train: {
+    OperationalTrainNumber: advertisedTrainNumber,
+    OperationalTrainDepartureDate: '2026-08-27',
+    JourneyPlanNumber: advertisedTrainNumber,
+    JourneyPlanDepartureDate: '2026-08-27',
+    AdvertisedTrainNumber: advertisedTrainNumber,
+  },
+  Position: { WGS84: 'POINT (18.05 59.33)' },
+  Status: { Active: true },
+  ModifiedTime: '2026-08-27T12:00:00.000Z',
+});
+
+test('bulk announcement query uses Trafikverket IN on AdvertisedTrainIdent', () => {
+  const xml = stringify({
+    QUERY: getAnnouncementsForTrainIdentsQuery(['539', '540', '1']),
+  });
+  assert.match(
+    xml,
+    /<IN name="AdvertisedTrainIdent" value="539,540,1"\s*\/>/
+  );
+  assert.match(xml, /<INCLUDE>Operator<\/INCLUDE>/);
+  assert.match(xml, /objecttype="TrainAnnouncement"/);
+  assert.match(xml, /schemaversion="2.0"/);
+  assert.match(xml, /namespace="Rail.TrafficInfo"/);
+});
+
+test('buildJourneyMetaMap takes first non-empty Operator per train', () => {
+  const stations = new Map([
+    ['Cst', 'Stockholm C'],
+    ['G', 'Göteborg C'],
+  ]);
+  const map = buildJourneyMetaMap(
+    [
+      {
+        AdvertisedTrainIdent: '539',
+        Operator: '',
+        ActivityType: 'Avgang',
+        LocationSignature: 'Cst',
+        ToLocation: { LocationName: 'G' },
+        AdvertisedTimeAtLocation: '2026-08-27T10:00:00.000+02:00',
+      },
+      {
+        AdvertisedTrainIdent: '539',
+        Operator: 'SJ',
+        ActivityType: 'Ankomst',
+        LocationSignature: 'G',
+        AdvertisedTimeAtLocation: '2026-08-27T13:00:00.000+02:00',
+      },
+      {
+        AdvertisedTrainIdent: '540',
+        Operator: 'ARRIVA',
+        ActivityType: 'Avgang',
+        LocationSignature: 'G',
+        ToLocation: [{ LocationName: 'Cst' }],
+        AdvertisedTimeAtLocation: '2026-08-27T11:00:00.000+02:00',
+      },
+    ],
+    stations
+  );
+
+  assert.equal(map.get('539')?.operator, 'SJ');
+  assert.equal(map.get('539')?.fromName, 'Stockholm C');
+  assert.equal(map.get('539')?.toName, 'Göteborg C');
+  assert.equal(map.get('540')?.operator, 'ARRIVA');
+  assert.equal(map.get('540')?.fromName, 'Göteborg C');
+  assert.equal(map.get('540')?.toName, 'Stockholm C');
+});
+
+test('fetchTrainPositions joins operator onto the DTO by advertised train number', async () => {
+  const positions = await fetchTrainPositions({
+    postAllPages: async (_query, entityName) => {
+      if (entityName === 'TrainPosition') {
+        return [snapshotPosition('539'), snapshotPosition('540')];
+      }
+      assert.equal(entityName, 'TrainAnnouncement');
+      return [
+        { AdvertisedTrainIdent: '539', Operator: 'SJ' },
+        { AdvertisedTrainIdent: '540', Operator: 'ARRIVA' },
+      ];
+    },
+  });
+
+  assert.equal(positions.length, 2);
+  assert.equal(positions[0].operator, 'SJ');
+  assert.equal(positions[1].operator, 'ARRIVA');
+  assert.equal(positions[0].train.advertisedTrainNumber, '539');
+  assert.equal(
+    (positions[0].train as { operator?: string }).operator,
+    undefined
+  );
+});
+
+test('fetchTrainPositions omits operator when unknown and does not throw', async () => {
+  const positions = await fetchTrainPositions({
+    postAllPages: async (_query, entityName) => {
+      if (entityName === 'TrainPosition') {
+        return [snapshotPosition('539'), snapshotPosition('999')];
+      }
+      throw new Error('TrainAnnouncement lookup failed');
+    },
+  });
+
+  assert.equal(positions.length, 2);
+  assert.equal(positions[0].operator, undefined);
+  assert.equal(positions[1].operator, undefined);
+  assert.equal(positions[0].train.advertisedTrainNumber, '539');
+  assert.equal(positions[1].train.advertisedTrainNumber, '999');
+});
+
+test('fetchTrainPositions does not call announcements once per train', async () => {
+  const trainCount = TRAIN_IDENT_IN_BATCH_SIZE + 20;
+  const trains = Array.from({ length: trainCount }, (_, i) =>
+    snapshotPosition(String(i + 1))
+  );
+  let announcementCalls = 0;
+  const inValues: string[] = [];
+
+  const positions = await fetchTrainPositions({
+    postAllPages: async (query, entityName) => {
+      if (entityName === 'TrainPosition') return trains;
+      announcementCalls += 1;
+      const value = (query as { FILTER?: { AND?: { IN?: { '@value'?: string } } } })
+        .FILTER?.AND?.IN?.['@value'];
+      assert.ok(value, 'expected IN filter on AdvertisedTrainIdent');
+      inValues.push(value);
+      return value.split(',').map((ident) => ({
+        AdvertisedTrainIdent: ident,
+        Operator: 'SJ',
+      }));
+    },
+  });
+
+  assert.equal(positions.length, trainCount);
+  assert.ok(positions.every((position) => position.operator === 'SJ'));
+  assert.ok(announcementCalls >= 1);
+  assert.ok(
+    announcementCalls < trainCount,
+    `expected bounded announcement calls, got ${announcementCalls} for ${trainCount} trains`
+  );
+  assert.equal(
+    announcementCalls,
+    Math.ceil(trainCount / TRAIN_IDENT_IN_BATCH_SIZE)
+  );
+  assert.equal(
+    inValues.join(',').split(',').length,
+    trainCount
+  );
 });
 
 test('post still throws on HTTP 206', async (t) => {

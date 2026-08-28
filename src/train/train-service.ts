@@ -1,3 +1,7 @@
+import {
+  fetchJourneyMetaByTrainIdents,
+  type JourneyMeta,
+} from '../announcement/announcement-service.js';
 import client from '../trafikverket/client.js';
 import {
   getTrainPositionForTrainQuery,
@@ -37,6 +41,9 @@ export type TrainPositionDto = {
     active: boolean;
   };
   modifiedTime: string;
+  operator?: string;
+  fromName?: string;
+  toName?: string;
 };
 
 export type TrainPositionRecord = {
@@ -47,8 +54,11 @@ export type TrainPositionRecord = {
   modifiedTime?: string;
 };
 
-const buildTrainPositionDto = (position: TrainPosition): TrainPositionDto => {
-  return {
+const buildTrainPositionDto = (
+  position: TrainPosition,
+  meta?: JourneyMeta
+): TrainPositionDto => {
+  const dto: TrainPositionDto = {
     train: {
       operationalTrainNumber: position.Train?.OperationalTrainNumber ?? '',
       operationalTrainDepartureDate:
@@ -65,6 +75,10 @@ const buildTrainPositionDto = (position: TrainPosition): TrainPositionDto => {
     },
     modifiedTime: position.ModifiedTime ?? '',
   };
+  if (meta?.operator) dto.operator = meta.operator;
+  if (meta?.fromName) dto.fromName = meta.fromName;
+  if (meta?.toName) dto.toName = meta.toName;
+  return dto;
 };
 
 const toTrainPositionRecord = (
@@ -118,7 +132,28 @@ export const fetchTrainPositions = async (
   if (!Array.isArray(positions)) {
     throw new Error('Expected TrainPosition array from Trafikverket');
   }
-  return positions.map((p) => buildTrainPositionDto(p));
+
+  const idents = [
+    ...new Set(
+      positions
+        .map((position) => position.Train?.AdvertisedTrainNumber?.trim())
+        .filter((ident): ident is string => Boolean(ident))
+    ),
+  ];
+
+  let metaByIdent = new Map<string, JourneyMeta>();
+  try {
+    metaByIdent = await fetchJourneyMetaByTrainIdents(idents, tv);
+  } catch {
+    metaByIdent = new Map();
+  }
+
+  return positions.map((position) =>
+    buildTrainPositionDto(
+      position,
+      metaByIdent.get(position.Train?.AdvertisedTrainNumber?.trim() ?? '')
+    )
+  );
 };
 
 export const fetchLatestTrainPosition = async (
