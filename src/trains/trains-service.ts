@@ -1,3 +1,4 @@
+import type { AdvertisedTimeWindow } from '../announcement/advertised-time-window.js';
 import { resolveAnnouncementsForTrainId } from '../announcement/announcement-service.js';
 import type { FormattedAnnouncementDto } from '../announcement/announcement.types.js';
 import {
@@ -90,8 +91,11 @@ export const buildTrainJourney = (
   };
 };
 
-export const fetchTrainJourney = async (trainId: string) => {
-  const announcements = await resolveAnnouncementsForTrainId(trainId);
+export const fetchTrainJourney = async (
+  trainId: string,
+  window?: AdvertisedTimeWindow
+) => {
+  const announcements = await resolveAnnouncementsForTrainId(trainId, window);
   return buildTrainJourney(announcements);
 };
 

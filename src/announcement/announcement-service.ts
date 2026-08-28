@@ -2,6 +2,7 @@ import {
   fetchAllStations,
   type StationDto,
 } from '../stations/stations-service.js';
+import type { AdvertisedTimeWindow } from './advertised-time-window.js';
 import {
   getAnnouncementsAtStationQuery,
   getAnnouncementsForTrainIdentsQuery,
@@ -107,7 +108,7 @@ const getFormattedAnnouncementDtos = (
 const fetchFormattedAnnouncements = async (
   query: ReturnType<typeof getAnnouncementsForTrainQuery>
 ) => {
-  const announcements = await client.post<Announcement[]>(
+  const announcements = await client.postAllPages<Announcement>(
     query,
     'TrainAnnouncement'
   );
@@ -117,21 +118,31 @@ const fetchFormattedAnnouncements = async (
   return getFormattedAnnouncementDtos(announcementDtos, stations);
 };
 
-export const fetchAnnouncementsForTrain = async (trainId: string) =>
-  fetchFormattedAnnouncements(getAnnouncementsForTrainQuery(trainId));
+export const fetchAnnouncementsForTrain = async (
+  trainId: string,
+  window?: AdvertisedTimeWindow
+) => fetchFormattedAnnouncements(getAnnouncementsForTrainQuery(trainId, window));
 
-export const fetchAnnouncementsForTrainReference = async (trainId: string) =>
-  fetchFormattedAnnouncements(getAnnouncementsForTrainReferenceQuery(trainId));
+export const fetchAnnouncementsForTrainReference = async (
+  trainId: string,
+  window?: AdvertisedTimeWindow
+) =>
+  fetchFormattedAnnouncements(
+    getAnnouncementsForTrainReferenceQuery(trainId, window)
+  );
 
 /** AdvertisedTrainIdent, or AdvertisedTrainReference when that is a unique match. */
-export const resolveAnnouncementsForTrainId = async (trainId: string) => {
+export const resolveAnnouncementsForTrainId = async (
+  trainId: string,
+  window?: AdvertisedTimeWindow
+) => {
   const id = trainId.trim();
   if (!id) return [];
 
-  const byIdent = await fetchAnnouncementsForTrain(id);
+  const byIdent = await fetchAnnouncementsForTrain(id, window);
   if (byIdent.length > 0) return byIdent;
 
-  const byReference = await fetchAnnouncementsForTrainReference(id);
+  const byReference = await fetchAnnouncementsForTrainReference(id, window);
   const idents = new Set(
     byReference
       .map((announcement) => announcement.advertisedTrainIdent)
@@ -145,14 +156,19 @@ export const fetchAnnouncementsAtStation = async (
   stationId: string,
   activityType: StationActivityType,
   canceled?: boolean,
-  delayed: boolean = false
+  delayed: boolean = false,
+  window?: AdvertisedTimeWindow
 ) => {
   const query = getAnnouncementsAtStationQuery(
     stationId,
     activityType,
-    canceled
+    canceled,
+    window
   );
-  const res = await client.post<Announcement[]>(query, 'TrainAnnouncement');
+  const res = await client.postAllPages<Announcement>(
+    query,
+    'TrainAnnouncement'
+  );
   const announcementDtos = res.map((a) => buildAnnouncementDto(a));
   const stations = await fetchAllStations();
   const formattedAnnouncements = getFormattedAnnouncementDtos(
@@ -167,14 +183,30 @@ export const fetchAnnouncementsAtStation = async (
 export const fetchDeparturesFromStation = (
   stationId: string,
   canceled?: boolean,
-  delayed: boolean = false
-) => fetchAnnouncementsAtStation(stationId, 'Avgang', canceled, delayed);
+  delayed: boolean = false,
+  window?: AdvertisedTimeWindow
+) =>
+  fetchAnnouncementsAtStation(
+    stationId,
+    'Avgang',
+    canceled,
+    delayed,
+    window
+  );
 
 export const fetchArrivalsAtStation = (
   stationId: string,
   canceled?: boolean,
-  delayed: boolean = false
-) => fetchAnnouncementsAtStation(stationId, 'Ankomst', canceled, delayed);
+  delayed: boolean = false,
+  window?: AdvertisedTimeWindow
+) =>
+  fetchAnnouncementsAtStation(
+    stationId,
+    'Ankomst',
+    canceled,
+    delayed,
+    window
+  );
 
 const getDelayedAnnouncementDtos = (
   announcements: FormattedAnnouncementDto[]

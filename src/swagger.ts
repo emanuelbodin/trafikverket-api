@@ -19,6 +19,32 @@ const options: swaggerJsdoc.Options = {
       },
     ],
     components: {
+      parameters: {
+        AdvertisedTimeFrom: {
+          in: 'query',
+          name: 'from',
+          required: false,
+          schema: {
+            type: 'string',
+            format: 'date-time',
+            example: '2026-08-28T00:00:00+02:00',
+          },
+          description:
+            'Lower bound on AdvertisedTimeAtLocation (`GT`). ISO-8601 date-time. Omit for no lower bound.',
+        },
+        AdvertisedTimeTo: {
+          in: 'query',
+          name: 'to',
+          required: false,
+          schema: {
+            type: 'string',
+            format: 'date-time',
+            example: '2026-08-28T23:59:59+02:00',
+          },
+          description:
+            'Upper bound on AdvertisedTimeAtLocation (`LT`). ISO-8601 date-time. Omit for no upper bound. Neither `from` nor `to` means no advertised-time filter.',
+        },
+      },
       schemas: {
         LocationInfo: {
           type: 'object',
