@@ -105,3 +105,33 @@ export const getAnnouncementsForTrainQuery = (trainId: string) =>
 
 export const getAnnouncementsForTrainReferenceQuery = (trainId: string) =>
   getAnnouncementsForTrainFieldQuery('AdvertisedTrainReference', trainId);
+
+/** Max AdvertisedTrainIdent values per Trafikverket IN filter (XML length). */
+export const TRAIN_IDENT_IN_BATCH_SIZE = 100;
+
+const journeyMetaInclude = [
+  'AdvertisedTrainIdent',
+  'Operator',
+  'ActivityType',
+  'LocationSignature',
+  'FromLocation',
+  'ToLocation',
+  'AdvertisedTimeAtLocation',
+];
+
+/** Bulk TrainAnnouncement lookup for a snapshot of advertised train numbers. */
+export const getAnnouncementsForTrainIdentsQuery = (trainIds: string[]) => {
+  return {
+    ...trainAnnouncementQueryBase,
+    FILTER: {
+      AND: {
+        IN: {
+          '@name': 'AdvertisedTrainIdent',
+          '@value': trainIds.join(','),
+        },
+        ...advertisedTimeWindow,
+      },
+    },
+    INCLUDE: journeyMetaInclude,
+  };
+};

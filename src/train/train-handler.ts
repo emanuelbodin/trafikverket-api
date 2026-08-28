@@ -43,6 +43,17 @@ const router = Router();
  *         modifiedTime:
  *           type: string
  *           description: Last modified timestamp
+ *         operator:
+ *           type: string
+ *           description: >
+ *             Train operator from TrainAnnouncement.Operator (same string as
+ *             GET /api/trains/{trainId}), when known
+ *         fromName:
+ *           type: string
+ *           description: Origin station name, when known
+ *         toName:
+ *           type: string
+ *           description: Destination station name, when known
  */
 
 /**
@@ -58,6 +69,8 @@ const router = Router();
  *       (HTTP 206 = too large, continue from `INFO.LASTCHANGEID`; omitted
  *       entity key = empty/done). There is no 59-second `ModifiedTime` window
  *       and no `@limit` cap — this is every active train, not recent updates.
+ *       `operator` (and `fromName`/`toName` when known) are joined in bulk from
+ *       TrainAnnouncement by advertised train number — not one request per train.
  *     responses:
  *       200:
  *         description: Complete list of active train positions
@@ -78,7 +91,7 @@ const router = Router();
  *     description: >
  *       Alias of `/api/train/position`. Complete snapshot of currently active
  *       trains (`Status.Active=true`), paged with `changeid` until Trafikverket
- *       is done.
+ *       is done. Includes bulk-joined `operator` when known.
  *     responses:
  *       200:
  *         description: Complete list of active train positions

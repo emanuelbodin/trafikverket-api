@@ -4,8 +4,10 @@ import {
 } from '../stations/stations-service.js';
 import {
   getAnnouncementsAtStationQuery,
+  getAnnouncementsForTrainIdentsQuery,
   getAnnouncementsForTrainQuery,
   getAnnouncementsForTrainReferenceQuery,
+  TRAIN_IDENT_IN_BATCH_SIZE,
   type StationActivityType,
 } from './announcement-queries.js';
 import type {
@@ -185,4 +187,199 @@ const getDelayedAnnouncementDtos = (
       announcement.canceled
     );
   });
+};
+
+const JOURNEY_META_CACHE_TTL_MS = 45 * 60 * 1000;
+
+export type JourneyMeta = {
+  operator?: string;
+  fromName?: string;
+  toName?: string;
+};
+
+type LocationRef = { LocationName?: string };
+
+export type JourneyAnnouncement = {
+  AdvertisedTrainIdent?: string;
+  Operator?: string;
+  ActivityType?: string;
+  LocationSignature?: string;
+  AdvertisedTimeAtLocation?: string;
+  FromLocation?: LocationRef[] | LocationRef;
+  ToLocation?: LocationRef[] | LocationRef;
+};
+
+type JourneyMetaCache = {
+  byIdent: Map<string, JourneyMeta>;
+  expiresAt: number;
+};
+
+let journeyMetaCache: JourneyMetaCache | null = null;
+
+export const clearJourneyMetaCache = () => {
+  journeyMetaCache = null;
+};
+
+const asLocationList = (
+  value: LocationRef[] | LocationRef | undefined
+): LocationRef[] => {
+  if (!value) return [];
+  return Array.isArray(value) ? value : [value];
+};
+
+const firstLocationName = (
+  value: LocationRef[] | LocationRef | undefined
+): string | undefined => {
+  const name = asLocationList(value)[0]?.LocationName?.trim();
+  return name || undefined;
+};
+
+const chunk = <T>(items: T[], size: number): T[][] => {
+  const chunks: T[][] = [];
+  for (let i = 0; i < items.length; i += size) {
+    chunks.push(items.slice(i, i + size));
+  }
+  return chunks;
+};
+
+const resolveStationName = (
+  signature: string | undefined,
+  stationNameBySignature: Map<string, string>
+): string | undefined => {
+  if (!signature) return undefined;
+  return stationNameBySignature.get(signature);
+};
+
+/** First non-empty Operator per advertised train; optional origin/destination names. */
+export const buildJourneyMetaMap = (
+  announcements: JourneyAnnouncement[],
+  stationNameBySignature: Map<string, string> = new Map()
+): Map<string, JourneyMeta> => {
+  type Acc = {
+    operator?: string;
+    fromSignature?: string;
+    avgangFromSignature?: string;
+    toSignature?: string;
+  };
+
+  const accByIdent = new Map<string, Acc>();
+  const ordered = [...announcements].sort((a, b) =>
+    (a.AdvertisedTimeAtLocation ?? '').localeCompare(
+      b.AdvertisedTimeAtLocation ?? ''
+    )
+  );
+
+  for (const announcement of ordered) {
+    const ident = announcement.AdvertisedTrainIdent?.trim();
+    if (!ident) continue;
+
+    const acc = accByIdent.get(ident) ?? {};
+    const operator = announcement.Operator?.trim();
+    if (!acc.operator && operator) acc.operator = operator;
+
+    const locationSignature = announcement.LocationSignature?.trim();
+    if (locationSignature) {
+      if (!acc.fromSignature) acc.fromSignature = locationSignature;
+      if (
+        !acc.avgangFromSignature &&
+        announcement.ActivityType === 'Avgang'
+      ) {
+        acc.avgangFromSignature = locationSignature;
+      }
+    }
+
+    const fromLocation = firstLocationName(announcement.FromLocation);
+    if (!acc.fromSignature && fromLocation) acc.fromSignature = fromLocation;
+
+    const toLocation = firstLocationName(announcement.ToLocation);
+    if (!acc.toSignature && toLocation) acc.toSignature = toLocation;
+
+    accByIdent.set(ident, acc);
+  }
+
+  const result = new Map<string, JourneyMeta>();
+  for (const [ident, acc] of accByIdent) {
+    const meta: JourneyMeta = {};
+    if (acc.operator) meta.operator = acc.operator;
+    const fromSignature = acc.avgangFromSignature ?? acc.fromSignature;
+    const fromName = resolveStationName(fromSignature, stationNameBySignature);
+    if (fromName) meta.fromName = fromName;
+    const toName = resolveStationName(acc.toSignature, stationNameBySignature);
+    if (toName) meta.toName = toName;
+    result.set(ident, meta);
+  }
+  return result;
+};
+
+const resolveStationNames = async (
+  tv: Pick<typeof client, 'postAllPages'>
+): Promise<Map<string, string>> => {
+  if (tv !== client) return new Map();
+  try {
+    const stations = await fetchAllStations();
+    return new Map(
+      stations.map((station) => [
+        station.locationSignature,
+        station.locationName,
+      ])
+    );
+  } catch {
+    return new Map();
+  }
+};
+
+/**
+ * Bulk-join helpers for the position snapshot. One (batched) TrainAnnouncement
+ * query — never per-train HTTP. Cache is 45 min; unknown idents are omitted.
+ */
+export const fetchJourneyMetaByTrainIdents = async (
+  idents: string[],
+  tv: Pick<typeof client, 'postAllPages'> = client
+): Promise<Map<string, JourneyMeta>> => {
+  const unique = [
+    ...new Set(idents.map((ident) => ident.trim()).filter(Boolean)),
+  ];
+  const result = new Map<string, JourneyMeta>();
+  if (unique.length === 0) return result;
+
+  const cacheEnabled = tv === client;
+  const now = Date.now();
+  if (cacheEnabled) {
+    if (!journeyMetaCache || now >= journeyMetaCache.expiresAt) {
+      journeyMetaCache = {
+        byIdent: new Map(),
+        expiresAt: now + JOURNEY_META_CACHE_TTL_MS,
+      };
+    }
+  }
+
+  const store = cacheEnabled
+    ? journeyMetaCache!.byIdent
+    : new Map<string, JourneyMeta>();
+  const missing = unique.filter((ident) => !store.has(ident));
+
+  if (missing.length > 0) {
+    const stationNames = await resolveStationNames(tv);
+    for (const batch of chunk(missing, TRAIN_IDENT_IN_BATCH_SIZE)) {
+      try {
+        const rows = await tv.postAllPages<JourneyAnnouncement>(
+          getAnnouncementsForTrainIdentsQuery(batch),
+          'TrainAnnouncement'
+        );
+        const list = Array.isArray(rows) ? rows : [];
+        const mapped = buildJourneyMetaMap(list, stationNames);
+        for (const ident of batch) {
+          store.set(ident, mapped.get(ident) ?? {});
+        }
+      } catch {
+        // Keep the position snapshot; omit operator for this batch.
+      }
+    }
+  }
+
+  for (const ident of unique) {
+    const meta = store.get(ident);
+    if (meta) result.set(ident, meta);
+  }
+  return result;
 };
