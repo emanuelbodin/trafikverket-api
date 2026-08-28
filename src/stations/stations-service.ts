@@ -39,6 +39,10 @@ const STATIONS_CACHE_TTL_MS = 6 * 60 * 60 * 1000;
 
 let stationsCache: { stations: StationDto[]; expiresAt: number } | null = null;
 
+export const clearStationsCache = () => {
+  stationsCache = null;
+};
+
 export const fetchAllStations = async () => {
   const now = Date.now();
   if (stationsCache && now < stationsCache.expiresAt) {
