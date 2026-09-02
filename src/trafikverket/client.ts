@@ -37,6 +37,8 @@ export type PostAllPagesOptions = {
   onMissingChangeId?: 'throw' | 'return';
   /** After at least one page of items, return them instead of failing the request. */
   onPageError?: 'throw' | 'return';
+  /** Omit changeid (TrainMessage snapshots reject INCLUDE with changeid). Default true. */
+  useChangeId?: boolean;
 };
 
 const lastChangeIdOf = (result: TrafikverketResult): string | undefined => {
@@ -142,14 +144,17 @@ const postAllPages = async <T>(
   entityName: string,
   options: PostAllPagesOptions = {}
 ): Promise<T[]> => {
+  const useChangeId = options.useChangeId ?? true;
   let changeId = '0';
   const items: T[] = [];
 
   for (let page = 0; page < MAX_CHANGEID_PAGES; page++) {
-    const pageQuery = {
-      ...(query as object),
-      '@changeid': changeId,
-    };
+    const pageQuery = useChangeId
+      ? {
+          ...(query as object),
+          '@changeid': changeId,
+        }
+      : (query as object);
     let result: QueryPage<T[]>;
     try {
       result = await postPage<T[]>(pageQuery, entityName);
@@ -171,6 +176,15 @@ const postAllPages = async <T>(
 
     if (!result.truncated) {
       return items;
+    }
+
+    if (!useChangeId) {
+      if (options.onMissingChangeId === 'return') {
+        return items;
+      }
+      throw new Error(
+        'Trafikverket response too large (HTTP 206); snapshot paging unavailable'
+      );
     }
 
     const nextId = result.lastChangeId;

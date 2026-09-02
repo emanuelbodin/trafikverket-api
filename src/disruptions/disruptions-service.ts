@@ -248,7 +248,7 @@ const loadMessages = async (
       startTimeFrom: new Date(nowMs - TRAIN_MESSAGE_LOOKBACK_MS).toISOString(),
     }),
     'TrainMessage',
-    { onMissingChangeId: 'return', onPageError: 'return' }
+    { onMissingChangeId: 'return', onPageError: 'return', useChangeId: false }
   );
   const messages = Array.isArray(rows) ? rows : [];
   disruptionsCache = {

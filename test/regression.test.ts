@@ -365,6 +365,37 @@ test('postPage surfaces Trafikverket ERROR text on HTTP 400', async (t) => {
   );
 });
 
+test('postAllPages can omit changeid for single-page snapshots', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  const bodies: unknown[] = [];
+  globalThis.fetch = (async (_url: unknown, init?: RequestInit) => {
+    bodies.push(init?.body);
+    return jsonResponse(200, {
+      RESPONSE: {
+        RESULT: [
+          {
+            TrainMessage: [{ EventId: 'evt-1' }],
+          },
+        ],
+      },
+    });
+  }) as typeof fetch;
+
+  const items = await client.postAllPages<{ EventId: string }>(
+    { '@objecttype': 'TrainMessage' },
+    'TrainMessage',
+    { useChangeId: false }
+  );
+
+  assert.deepEqual(items, [{ EventId: 'evt-1' }]);
+  assert.equal(bodies.length, 1);
+  assert.doesNotMatch(String(bodies[0]), /changeid=/);
+});
+
 test('postAllPages treats omitted entity key as empty/done', async (t) => {
   const originalFetch = globalThis.fetch;
   t.after(() => {
