@@ -10,7 +10,7 @@ const { app } = await import('../src/app.ts');
 const { clearStationsCache } = await import(
   '../src/stations/stations-service.ts'
 );
-const { getCurrentTrainMessagesQuery } = await import(
+const { getCurrentOperativeEventsQuery } = await import(
   '../src/disruptions/disruptions-queries.ts'
 );
 const {
@@ -46,7 +46,49 @@ describe('etapp 3 disruptions', { concurrency: 1 }, () => {
     clearStationsCache();
   });
 
-  test('maps a TrainMessage-like payload onto the DTO', () => {
+  test('maps an OperativeEvent payload onto the DTO', () => {
+    const names = new Map([
+      ['Cst', 'Stockholm C'],
+      ['U', 'Uppsala C'],
+    ]);
+    const dto = buildDisruptionDto(
+      {
+        OperativeEventId: 'op-42',
+        EventType: { Description: 'signalfel' },
+        StartDateTime: '2026-08-28T08:00:00.000+02:00',
+        EndDateTime: '2026-08-28T18:00:00.000+02:00',
+        ModifiedDateTime: '2026-08-28T09:15:00.000+02:00',
+        EventSection: {
+          FromLocation: { Signature: 'Cst' },
+          ToLocation: { Signature: 'U' },
+        },
+        TrafficImpact: {
+          PublicMessage: {
+            Header: 'Signalfel',
+            Description:
+              'Tågtrafik påverkas mellan Stockholm C och Uppsala C.',
+          },
+        },
+      },
+      names
+    );
+
+    assert.deepEqual(dto, {
+      id: 'op-42',
+      header: 'Signalfel',
+      description: 'Tågtrafik påverkas mellan Stockholm C och Uppsala C.',
+      reason: 'signalfel',
+      startTime: '2026-08-28T08:00:00.000+02:00',
+      endTime: '2026-08-28T18:00:00.000+02:00',
+      stations: [
+        { signature: 'Cst', name: 'Stockholm C' },
+        { signature: 'U', name: 'Uppsala C' },
+      ],
+      modifiedTime: '2026-08-28T09:15:00.000+02:00',
+    });
+  });
+
+  test('maps a legacy TrainMessage-like payload onto the DTO', () => {
     const names = new Map([
       ['Cst', 'Stockholm C'],
       ['U', 'Uppsala C'],
@@ -103,8 +145,8 @@ describe('etapp 3 disruptions', { concurrency: 1 }, () => {
 
   test('omits empty optional fields and does not use ReasonCode.Code as reason', () => {
     const dto = buildDisruptionDto({
-      EventId: 'evt-1',
-      ReasonCode: { Code: 'ISE' },
+      OperativeEventId: 'evt-1',
+      EventType: { EventTypeCode: 'ISE' },
     });
     assert.deepEqual(dto, { id: 'evt-1' });
     assert.equal('reason' in dto!, false);
@@ -130,16 +172,14 @@ describe('etapp 3 disruptions', { concurrency: 1 }, () => {
       tv: {
         postAllPages: async () => [
           {
-            EventId: 'cst-only',
-            TrafficImpact: {
-              AffectedLocation: [{ LocationSignature: 'Cst' }],
-            },
+            OperativeEventId: 'cst-only',
+            EventTrafficType: 0,
+            EventSection: { FromLocation: { Signature: 'Cst' } },
           },
           {
-            EventId: 'gothenburg',
-            TrafficImpact: {
-              AffectedLocation: [{ LocationSignature: 'G' }],
-            },
+            OperativeEventId: 'gothenburg',
+            EventTrafficType: 0,
+            EventSection: { FromLocation: { Signature: 'G' } },
           },
         ],
       },
@@ -160,7 +200,7 @@ describe('etapp 3 disruptions', { concurrency: 1 }, () => {
     const tv = {
       postAllPages: async () => {
         calls += 1;
-        return [{ EventId: 'cached' }];
+        return [{ OperativeEventId: 'cached', EventTrafficType: 0 }];
       },
     };
     let nowMs = 1_000;
@@ -197,14 +237,17 @@ describe('etapp 3 disruptions', { concurrency: 1 }, () => {
     assert.deepEqual(dto?.trains, ['539']);
   });
 
-  test('TrainMessage query is schema 1.7 without INCLUDE or changeid paging', () => {
-    const xml = stringify({ QUERY: getCurrentTrainMessagesQuery() });
-    assert.match(xml, /objecttype="TrainMessage"/);
-    assert.match(xml, /schemaversion="1.7"/);
-    assert.doesNotMatch(xml, /namespace=/);
-    assert.doesNotMatch(xml, /<INCLUDE>/);
-    assert.doesNotMatch(xml, /<FILTER>/);
-    assert.doesNotMatch(xml, /changeid=/);
+  test('OperativeEvent query uses ols.open schema 1.0 with active-event filter', () => {
+    const xml = stringify({ QUERY: getCurrentOperativeEventsQuery() });
+    assert.match(xml, /objecttype="OperativeEvent"/);
+    assert.match(xml, /schemaversion="1.0"/);
+    assert.match(xml, /namespace="ols.open"/);
+    assert.match(xml, /<EQ name="EventState" value="1"\s*\/>/);
+    assert.match(xml, /<INCLUDE>OperativeEventId<\/INCLUDE>/);
+    assert.match(
+      xml,
+      /<INCLUDE>TrafficImpact.PublicMessage.Description<\/INCLUDE>/
+    );
   });
 
   test('openapi documents GET /api/disruptions', () => {
@@ -253,24 +296,26 @@ describe('etapp 3 disruptions', { concurrency: 1 }, () => {
           },
         });
       }
-      if (body.includes('objecttype="TrainMessage"')) {
+      if (body.includes('objecttype="OperativeEvent"')) {
         return jsonResponse(200, {
           RESPONSE: {
             RESULT: [
               {
-                TrainMessage: [
+                OperativeEvent: [
                   {
-                    EventId: 'cst-event',
-                    Header: 'Banarbete',
+                    OperativeEventId: 'cst-event',
+                    EventTrafficType: 0,
                     TrafficImpact: {
-                      AffectedLocation: [{ LocationSignature: 'Cst' }],
+                      PublicMessage: { Header: 'Banarbete' },
+                      SelectedSection: {
+                        FromLocation: { Signature: 'Cst' },
+                      },
                     },
                   },
                   {
-                    EventId: 'uppsala-event',
-                    TrafficImpact: {
-                      AffectedLocation: [{ LocationSignature: 'U' }],
-                    },
+                    OperativeEventId: 'uppsala-event',
+                    EventTrafficType: 0,
+                    EventSection: { FromLocation: { Signature: 'U' } },
                   },
                 ],
               },
@@ -417,11 +462,14 @@ describe('etapp 3 disruptions', { concurrency: 1 }, () => {
         RESPONSE: {
           RESULT: [
             {
-              TrainMessage: [
+              OperativeEvent: [
                 {
-                  EventId: 'partial-page',
-                  Header: 'Signalfel',
-                  AffectedLocation: [{ LocationSignature: 'Cst' }],
+                  OperativeEventId: 'partial-page',
+                  EventTrafficType: 0,
+                  TrafficImpact: {
+                    PublicMessage: { Header: 'Signalfel' },
+                  },
+                  EventSection: { FromLocation: { Signature: 'Cst' } },
                 },
               ],
             },

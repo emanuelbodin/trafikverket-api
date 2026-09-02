@@ -1,19 +1,45 @@
-/** Default lookback when filtering messages in JS (StartDateTime). */
-export const TRAIN_MESSAGE_LOOKBACK_MS = 14 * 24 * 60 * 60 * 1000;
+const operativeEventProperties = [
+  'OperativeEventId',
+  'EventType',
+  'StartDateTime',
+  'EndDateTime',
+  'EventState',
+  'EventTrafficType',
+  'ModifiedDateTime',
+  'ModifiedTime',
+  'Deleted',
+  'RailRoadTimeForServiceResumption',
+  'EventSection.FromLocation.Signature',
+  'EventSection.ViaLocation.Signature',
+  'EventSection.ToLocation.Signature',
+  'TrafficImpact.PublicMessage.Header',
+  'TrafficImpact.PublicMessage.Description',
+  'TrafficImpact.EndDateTime',
+  'TrafficImpact.SelectedSection.FromLocation.Signature',
+  'TrafficImpact.SelectedSection.ViaLocation.Signature',
+  'TrafficImpact.SelectedSection.ToLocation.Signature',
+  'TrafficImpact.SelectedSection.IntermediateLocation.Signature',
+];
 
-export type TrainMessageQueryOptions = Record<string, never>;
+/** Default lookback when filtering messages in JS (StartDateTime). */
+export const OPERATIVE_EVENT_LOOKBACK_MS = 14 * 24 * 60 * 60 * 1000;
 
 /**
- * TrainMessage snapshot. Schema 1.7 has no Rail.TrafficInfo successor
- * (unlike TrainAnnouncement 2.0) and no namespace.
- * TrainMessage rejects INCLUDE on 1.7 (Invalid query attribute …), so the
- * snapshot is unfiltered upstream; ended/old rows are dropped in JS.
+ * OperativeEvent snapshot (TrainMessage successor in ols.open v1.0).
+ * Upstream filter keeps ongoing rail-related events; ended/old rows are
+ * also dropped in JS.
  */
-export const getCurrentTrainMessagesQuery = (
-  _options: TrainMessageQueryOptions = {}
-) => {
+export const getCurrentOperativeEventsQuery = () => {
   return {
-    '@objecttype': 'TrainMessage',
-    '@schemaversion': '1.7',
+    '@objecttype': 'OperativeEvent',
+    '@schemaversion': '1.0',
+    '@namespace': 'ols.open',
+    FILTER: {
+      EQ: [{ '@name': 'EventState', '@value': '1' }],
+    },
+    INCLUDE: operativeEventProperties,
   };
 };
+
+/** @deprecated TrainMessage was removed upstream; use getCurrentOperativeEventsQuery. */
+export const getCurrentTrainMessagesQuery = getCurrentOperativeEventsQuery;

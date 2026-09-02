@@ -30,7 +30,7 @@ const sendLookupError = (
  *       properties:
  *         id:
  *           type: string
- *           description: Stable Trafikverket event id (TrainMessage.EventId)
+ *           description: Stable Trafikverket operative event id (OperativeEventId)
  *         header:
  *           type: string
  *           description: Short title when Trafikverket provides one
@@ -71,9 +71,9 @@ const sendLookupError = (
  *       - Disruptions
  *     summary: List current railway disruptions
  *     description: >
- *       JSON array of currently relevant railway disruptions (not a 1:1
- *       TrainMessage dump). Historical-only messages are omitted. Empty
- *       upstream is `[]`. Optional `station` uses the same lookup as other
+ *       JSON array of currently relevant railway disruptions sourced from
+ *       Trafikverket OperativeEvent (TrainMessage successor). Historical-only
+ *       messages are omitted. Empty upstream is `[]`. Optional `station` uses
  *       routes (signature, then name, then unique prefix).
  *     parameters:
  *       - in: query
