@@ -18,7 +18,6 @@ const operativeEventProperties = [
   'TrafficImpact.SelectedSection.FromLocation.Signature',
   'TrafficImpact.SelectedSection.ViaLocation.Signature',
   'TrafficImpact.SelectedSection.ToLocation.Signature',
-  'TrafficImpact.SelectedSection.IntermediateLocation.Signature',
 ];
 
 /** Default lookback when filtering messages in JS (StartDateTime). */
