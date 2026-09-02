@@ -1,5 +1,5 @@
 const trainMessageProperties = [
-  'EventId',
+  // EventId is returned by default and rejects INCLUDE on schema 1.7.
   'Header',
   'ExternalDescription',
   'ReasonCode',
@@ -10,7 +10,6 @@ const trainMessageProperties = [
   'LastUpdateDateTime',
   'ModifiedTime',
   'Deleted',
-  // Nested paths keep the payload smaller than full TrafficImpact.
   'TrafficImpact.AffectedLocation',
   'TrafficImpact.AffectedTrain',
   'TrafficImpact.AdvertisedTrainIdent',

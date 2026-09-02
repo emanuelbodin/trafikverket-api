@@ -209,7 +209,7 @@ describe('etapp 3 disruptions', { concurrency: 1 }, () => {
     assert.doesNotMatch(xml, /\$now/);
     assert.doesNotMatch(xml, /<INCLUDE>TrafficImpact<\/INCLUDE>/);
     assert.match(xml, /<GT name="StartDateTime" value="2026-09-01T00:00:00.000Z"\s*\/>/);
-    assert.match(xml, /<INCLUDE>EventId<\/INCLUDE>/);
+    assert.doesNotMatch(xml, /<INCLUDE>EventId<\/INCLUDE>/);
     assert.match(xml, /<INCLUDE>ExternalDescription<\/INCLUDE>/);
     assert.match(xml, /<INCLUDE>ReasonCodeText<\/INCLUDE>/);
     assert.match(xml, /<INCLUDE>TrafficImpact.AffectedLocation<\/INCLUDE>/);
