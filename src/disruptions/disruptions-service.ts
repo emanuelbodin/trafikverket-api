@@ -207,6 +207,13 @@ const hasEnded = (endTime: string | undefined, nowMs: number): boolean => {
   return ms <= nowMs;
 };
 
+const isTooOld = (startTime: string | undefined, nowMs: number): boolean => {
+  if (!startTime) return false;
+  const ms = Date.parse(startTime);
+  if (!Number.isFinite(ms)) return false;
+  return ms < nowMs - TRAIN_MESSAGE_LOOKBACK_MS;
+};
+
 export const filterDisruptionsByStation = (
   disruptions: DisruptionDto[],
   stationSignature: string
@@ -244,9 +251,7 @@ const loadMessages = async (
   }
 
   const rows = await tv.postAllPages<TrainMessage>(
-    getCurrentTrainMessagesQuery({
-      startTimeFrom: new Date(nowMs - TRAIN_MESSAGE_LOOKBACK_MS).toISOString(),
-    }),
+    getCurrentTrainMessagesQuery(),
     'TrainMessage',
     { onMissingChangeId: 'return', onPageError: 'return', useChangeId: false }
   );
@@ -277,7 +282,11 @@ export const fetchCurrentDisruptions = async (
     options.stationNameBySignature ?? (await loadStationNames(tv));
 
   const disruptions = messages
-    .filter((message) => !hasEnded(message.EndDateTime, nowMs))
+    .filter(
+      (message) =>
+        !hasEnded(message.EndDateTime, nowMs) &&
+        !isTooOld(message.StartDateTime, nowMs)
+    )
     .map((message) => buildDisruptionDto(message, names))
     .filter((dto): dto is DisruptionDto => Boolean(dto));
 

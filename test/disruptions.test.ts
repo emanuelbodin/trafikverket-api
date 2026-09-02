@@ -197,25 +197,14 @@ describe('etapp 3 disruptions', { concurrency: 1 }, () => {
     assert.deepEqual(dto?.trains, ['539']);
   });
 
-  test('TrainMessage query is schema 1.7 without EndDateTime filter or full TrafficImpact', () => {
-    const xml = stringify({
-      QUERY: getCurrentTrainMessagesQuery({
-        startTimeFrom: '2026-09-01T00:00:00.000Z',
-      }),
-    });
+  test('TrainMessage query is schema 1.7 without INCLUDE or changeid paging', () => {
+    const xml = stringify({ QUERY: getCurrentTrainMessagesQuery() });
     assert.match(xml, /objecttype="TrainMessage"/);
     assert.match(xml, /schemaversion="1.7"/);
     assert.doesNotMatch(xml, /namespace=/);
-    assert.doesNotMatch(xml, /\$now/);
-    assert.doesNotMatch(xml, /<INCLUDE>TrafficImpact<\/INCLUDE>/);
-    assert.match(xml, /<GT name="StartDateTime" value="2026-09-01T00:00:00.000Z"\s*\/>/);
-    assert.doesNotMatch(xml, /<INCLUDE>EventId<\/INCLUDE>/);
-    assert.match(xml, /<INCLUDE>ExternalDescription<\/INCLUDE>/);
-    assert.match(xml, /<INCLUDE>ReasonCodeText<\/INCLUDE>/);
-    assert.match(xml, /<INCLUDE>TrafficImpact.AffectedLocation<\/INCLUDE>/);
-    assert.match(xml, /<INCLUDE>TrafficImpact.AffectedTrain<\/INCLUDE>/);
-    assert.doesNotMatch(xml, /<INCLUDE>AffectedLocation<\/INCLUDE>/);
-    assert.doesNotMatch(xml, /<INCLUDE>AffectedTrain<\/INCLUDE>/);
+    assert.doesNotMatch(xml, /<INCLUDE>/);
+    assert.doesNotMatch(xml, /<FILTER>/);
+    assert.doesNotMatch(xml, /changeid=/);
   });
 
   test('openapi documents GET /api/disruptions', () => {
