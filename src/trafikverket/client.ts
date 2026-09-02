@@ -35,6 +35,8 @@ export type QueryPage<T> = {
 export type PostAllPagesOptions = {
   /** HTTP 206 with no new LASTCHANGEID: throw (default) or return pages so far. */
   onMissingChangeId?: 'throw' | 'return';
+  /** After at least one page of items, return them instead of failing the request. */
+  onPageError?: 'throw' | 'return';
 };
 
 const lastChangeIdOf = (result: TrafikverketResult): string | undefined => {
@@ -45,6 +47,11 @@ const lastChangeIdOf = (result: TrafikverketResult): string | undefined => {
   const value = Array.isArray(raw) ? raw[0] : raw;
   if (value == null || value === '') return undefined;
   return String(value);
+};
+
+const errorMessageOf = (json: TrafikverketResponse): string | undefined => {
+  const message = json.RESPONSE?.RESULT?.[0]?.ERROR?.MESSAGE;
+  return typeof message === 'string' && message.trim() ? message.trim() : undefined;
 };
 
 const parseResult = <T>(
@@ -103,11 +110,16 @@ const postPage = async <T>(
     return parseResult<T>(json, entityName, true);
   }
 
+  const json = (await response.json()) as TrafikverketResponse;
   if (!response.ok) {
-    throw new Error(`Trafikverket HTTP ${response.status}`);
+    const detail = errorMessageOf(json);
+    throw new Error(
+      detail
+        ? `Trafikverket HTTP ${response.status}: ${detail}`
+        : `Trafikverket HTTP ${response.status}`
+    );
   }
 
-  const json = (await response.json()) as TrafikverketResponse;
   return parseResult<T>(json, entityName, false);
 };
 
@@ -138,7 +150,18 @@ const postAllPages = async <T>(
       ...(query as object),
       '@changeid': changeId,
     };
-    const result = await postPage<T[]>(pageQuery, entityName);
+    let result: QueryPage<T[]>;
+    try {
+      result = await postPage<T[]>(pageQuery, entityName);
+    } catch (err) {
+      if (options.onPageError === 'return' && items.length > 0) {
+        console.error(
+          `Trafikverket changeid page ${page + 1} failed; returning ${items.length} item(s) collected so far`
+        );
+        return items;
+      }
+      throw err;
+    }
     const pageItems = Array.isArray(result.items)
       ? result.items
       : result.items

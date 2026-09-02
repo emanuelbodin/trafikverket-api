@@ -295,6 +295,76 @@ test('postAllPages continues on HTTP 206 even when RESULT.ERROR is set', async (
   assert.match(String(bodies[1]), /changeid="10"/);
 });
 
+test('postAllPages returns partial items when a later page fails', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+
+  let calls = 0;
+  globalThis.fetch = (async () => {
+    calls += 1;
+    if (calls === 1) {
+      return jsonResponse(206, {
+        RESPONSE: {
+          RESULT: [
+            {
+              TrainMessage: [{ EventId: 'partial' }],
+              INFO: { LASTCHANGEID: '10' },
+            },
+          ],
+        },
+      });
+    }
+    return jsonResponse(400, {
+      RESPONSE: {
+        RESULT: [
+          {
+            ERROR: {
+              SOURCE: 'Request',
+              MESSAGE: 'Invalid changeid',
+            },
+          },
+        ],
+      },
+    });
+  }) as typeof fetch;
+
+  const items = await client.postAllPages<{ EventId: string }>(
+    { '@objecttype': 'TrainMessage' },
+    'TrainMessage',
+    { onPageError: 'return' }
+  );
+
+  assert.deepEqual(items, [{ EventId: 'partial' }]);
+  assert.equal(calls, 2);
+});
+
+test('postPage surfaces Trafikverket ERROR text on HTTP 400', async (t) => {
+  const originalFetch = globalThis.fetch;
+  t.after(() => {
+    globalThis.fetch = originalFetch;
+  });
+  globalThis.fetch = (async () =>
+    jsonResponse(400, {
+      RESPONSE: {
+        RESULT: [
+          {
+            ERROR: {
+              SOURCE: 'Request',
+              MESSAGE: 'Invalid include field',
+            },
+          },
+        ],
+      },
+    })) as typeof fetch;
+
+  await assert.rejects(
+    () => client.postPage({ '@objecttype': 'TrainMessage' }, 'TrainMessage'),
+    /Invalid include field/
+  );
+});
+
 test('postAllPages treats omitted entity key as empty/done', async (t) => {
   const originalFetch = globalThis.fetch;
   t.after(() => {

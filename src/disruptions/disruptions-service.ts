@@ -1,6 +1,6 @@
 import { fetchAllStations } from '../stations/stations-service.js';
 import client from '../trafikverket/client.js';
-import { getCurrentTrainMessagesQuery } from './disruptions-queries.js';
+import { getCurrentTrainMessagesQuery, TRAIN_MESSAGE_LOOKBACK_MS } from './disruptions-queries.js';
 
 export const DISRUPTIONS_CACHE_TTL_MS = 45_000;
 
@@ -244,9 +244,11 @@ const loadMessages = async (
   }
 
   const rows = await tv.postAllPages<TrainMessage>(
-    getCurrentTrainMessagesQuery(),
+    getCurrentTrainMessagesQuery({
+      startTimeFrom: new Date(nowMs - TRAIN_MESSAGE_LOOKBACK_MS).toISOString(),
+    }),
     'TrainMessage',
-    { onMissingChangeId: 'return' }
+    { onMissingChangeId: 'return', onPageError: 'return' }
   );
   const messages = Array.isArray(rows) ? rows : [];
   disruptionsCache = {
