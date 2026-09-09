@@ -21,8 +21,8 @@ The API writes structured JSON logs to stdout (pino). Each request gets an `X-Re
 On Railway (project **tåg**):
 
 - **prometheus** scrapes `GET /metrics` over private networking (`trafikverket-api.railway.internal:${SERVER_PORT}`).
-- **loki** is private. Build from `observability/loki`. It listens on `PORT` (default 3100).
-- **grafana** is public; sign in with user `admin` and the `GF_SECURITY_ADMIN_PASSWORD` set on that service. Set `PROMETHEUS_URL` and `LOKI_URL` (e.g. `http://loki.railway.internal:${{loki.PORT}}`). The **Trafikverket API**, **SLOs**, and **Logs** dashboards are provisioned automatically.
+- **loki** is private. Build from `observability/loki`. Pin `PORT`/`SERVER_PORT` to `3100` (Railway `PORT` is not always interpolable across services).
+- **grafana** is public; sign in with user `admin` and the `GF_SECURITY_ADMIN_PASSWORD` set on that service. Set `PROMETHEUS_URL` and `LOKI_URL` (e.g. `http://${{loki.RAILWAY_PRIVATE_DOMAIN}}:3100`). The **Trafikverket API**, **SLOs**, and **Logs** dashboards are provisioned automatically.
 - **trafikverket-api** should set `LOKI_URL` to the same Loki private URL so logs appear in Grafana.
 
 Proposed SLOs (availability, latency, process up, Trafikverket dependency) are in [`observability/slos.md`](observability/slos.md).
