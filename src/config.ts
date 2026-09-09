@@ -18,6 +18,12 @@ function getEnvOrUseDefault(env: string, defaultValue: string): string {
 const config = {
   port: process.env.PORT || getEnvOrUseDefault('SERVER_PORT', '3000'),
   trafikverketApiKey: getEnvOrThrowError('TRAFIKVERKET_API_KEY'),
+  logLevel: getEnvOrUseDefault(
+    'LOG_LEVEL',
+    process.env.npm_lifecycle_event === 'test' ? 'silent' : 'info'
+  ),
+  /** Loki push base URL, e.g. http://loki.railway.internal:3100. Unset = stdout only. */
+  lokiUrl: process.env.LOKI_URL?.trim() || undefined,
 };
 
 export default config;

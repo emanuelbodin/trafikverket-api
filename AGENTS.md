@@ -16,8 +16,8 @@ npm run dev            # tsx watch, port 3000
 
 - Node 24 (see `dockerfile`). Package manager is npm (`package-lock.json`).
 - `.npmrc` maps `@jsr` to `https://npm.jsr.io` for `@libs/xml`.
-- Required env: `TRAFIKVERKET_API_KEY`. Optional: `SERVER_PORT` (and Railway `PORT`). The process listens on `::` so private IPv6 scrapes work.
-- Never commit `.env`. Never log or echo the API key.
+- Required env: `TRAFIKVERKET_API_KEY`. Optional: `SERVER_PORT` (and Railway `PORT`), `LOG_LEVEL`, `LOKI_URL`. The process listens on `::` so private IPv6 scrapes work.
+- Never commit `.env`. Never log or echo the API key. JSON logs redact `trafikverketApiKey` / `authenticationkey`.
 
 ## Commands
 
@@ -34,11 +34,13 @@ After `npm run build`, run with `node dist/app.js` (Docker copies `dist` to `/ap
 ```
 src/app.ts                 # Express app, routes, swagger UI
 src/config.ts              # dotenv + env
+src/logger.ts              # pino JSON logs, request id, optional Loki push
 src/metrics.ts             # Prometheus registry, HTTP + Trafikverket instruments
 src/swagger.ts             # OpenAPI spec (swagger-jsdoc)
 src/trafikverket/client.ts # POST XML → JSON, unwrap RESPONSE.RESULT[0][entityName]
 observability/prometheus   # Prometheus image + scrape config (Railway)
-observability/grafana      # Grafana image, datasource, dashboard (Railway)
+observability/loki         # Loki image + filesystem config (Railway)
+observability/grafana      # Grafana image, datasources, dashboards (Railway)
 src/common/view.ts         # HTML departure table (not currently wired from handlers)
 src/{stations,train,announcement}/
   *-handler.ts             # Express Router + @openapi JSDoc

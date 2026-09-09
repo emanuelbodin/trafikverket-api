@@ -7,7 +7,7 @@
     "dev": "tsx --watch src/app.ts",
     "build": "tsc",
     "start": "node dist/app.js",
-    "test": "tsx --test test/*.test.ts"
+    "test": "LOG_LEVEL=silent tsx --test test/*.test.ts"
   },
   "author": "Emanuel Bodin",
   "license": "ISC",
@@ -26,6 +26,9 @@
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",
+    "pino": "^10.3.1",
+    "pino-http": "^11.0.0",
+    "pino-loki": "^3.0.0",
     "swagger-jsdoc": "^6.2.8",
     "swagger-ui-express": "^5.0.1"
   }

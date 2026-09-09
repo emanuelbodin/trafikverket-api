@@ -1,6 +1,7 @@
 import { stringify } from '@libs/xml';
 import type { stringifyable } from '@libs/xml/stringify';
 import config from '../config.js';
+import { getLogger } from '../logger.js';
 import {
   recordTrafikverketResult,
   startTrafikverketTimer,
@@ -78,7 +79,10 @@ const parseResult = <T>(
     if (!truncated) {
       throw new Error(`Trafikverket error (${source}): ${message}`);
     }
-    console.error(`Trafikverket HTTP 206 ERROR (${source}): ${message}`);
+    getLogger().error(
+      { source, entityError: message, truncated: true },
+      'Trafikverket HTTP 206 ERROR'
+    );
   }
 
   // Empty result sets omit the entity key entirely rather than sending [].
@@ -176,8 +180,9 @@ const postAllPages = async <T>(
       result = await postPage<T[]>(pageQuery, entityName);
     } catch (err) {
       if (options.onPageError === 'return' && items.length > 0) {
-        console.error(
-          `Trafikverket changeid page ${page + 1} failed; returning ${items.length} item(s) collected so far`
+        getLogger().error(
+          { err, page: page + 1, collected: items.length, entityName },
+          'Trafikverket changeid page failed; returning items collected so far'
         );
         return items;
       }

@@ -1,5 +1,6 @@
 import { Router, type Response } from 'express';
 import { parseAdvertisedTimeWindow } from '../announcement/advertised-time-window.js';
+import { logRouteError } from '../logger.js';
 import {
   fetchArrivalsAtStation,
   fetchDeparturesFromStation,
@@ -186,7 +187,7 @@ router.get('/:station/departures', async (req, res) => {
   } catch (err) {
     const message =
       err instanceof Error ? err.message : 'Failed to fetch departures';
-    console.error(`GET /api/stations/:station/departures failed: ${message}`);
+    logRouteError(req, err, 'GET /api/stations/:station/departures failed');
     return res.status(502).json({ error: message });
   }
 });
@@ -282,7 +283,7 @@ router.get('/:station/arrivals', async (req, res) => {
   } catch (err) {
     const message =
       err instanceof Error ? err.message : 'Failed to fetch arrivals';
-    console.error(`GET /api/stations/:station/arrivals failed: ${message}`);
+    logRouteError(req, err, 'GET /api/stations/:station/arrivals failed');
     return res.status(502).json({ error: message });
   }
 });
