@@ -1,0 +1,34 @@
+groups:
+  - name: slos
+    interval: 30s
+    rules:
+      - record: slo:http_api_requests:rate5m
+        expr: sum(rate(http_requests_total{job="trafikverket-api",route=~"/api.*"}[5m]))
+
+      - record: slo:http_api_errors:rate5m
+        expr: sum(rate(http_requests_total{job="trafikverket-api",route=~"/api.*",status_code=~"5.."}[5m]))
+
+      - record: slo:http_availability:ratio5m
+        expr: 1 - (slo:http_api_errors:rate5m / slo:http_api_requests:rate5m)
+
+      - record: slo:http_availability:burn1h
+        expr: |
+          (
+            sum(rate(http_requests_total{job="trafikverket-api",route=~"/api.*",status_code=~"5.."}[1h]))
+            /
+            sum(rate(http_requests_total{job="trafikverket-api",route=~"/api.*"}[1h]))
+          ) / 0.005
+
+      - record: slo:http_latency_fast:ratio5m
+        expr: |
+          sum(rate(http_request_duration_seconds_bucket{job="trafikverket-api",route=~"/api.*",le="5"}[5m]))
+          /
+          sum(rate(http_request_duration_seconds_count{job="trafikverket-api",route=~"/api.*"}[5m]))
+
+      - record: slo:trafikverket_success:ratio5m
+        expr: |
+          1 - (
+            sum(rate(trafikverket_requests_total{job="trafikverket-api",result="error"}[5m]))
+            /
+            sum(rate(trafikverket_requests_total{job="trafikverket-api"}[5m]))
+          )

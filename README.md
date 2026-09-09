@@ -19,4 +19,6 @@ The API is documented in Swagger at [http://localhost:3000/api-docs](http://loca
 On Railway (project **tåg**):
 
 - **prometheus** scrapes `GET /metrics` over private networking (`trafikverket-api.railway.internal:${SERVER_PORT}`).
-- **grafana** is public; sign in with user `admin` and the `GF_SECURITY_ADMIN_PASSWORD` set on that service. The **Trafikverket API** dashboard is provisioned automatically.
+- **grafana** is public; sign in with user `admin` and the `GF_SECURITY_ADMIN_PASSWORD` set on that service. The **Trafikverket API** and **SLOs** dashboards are provisioned automatically.
+
+Proposed SLOs (availability, latency, process up, Trafikverket dependency) are in [`observability/slos.md`](observability/slos.md).
