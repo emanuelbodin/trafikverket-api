@@ -1,6 +1,8 @@
 #!/bin/sh
 set -eu
 
+# Railway interpolates ${{trafikverket-api.SERVER_PORT}} (PORT is injected at
+# runtime and is not always available as a cross-service reference).
 TARGET="${API_SCRAPE_TARGET:-trafikverket-api.railway.internal:3000}"
 LISTEN_PORT="${PORT:-9090}"
 
