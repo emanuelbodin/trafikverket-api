@@ -34,8 +34,11 @@ After `npm run build`, run with `node dist/app.js` (Docker copies `dist` to `/ap
 ```
 src/app.ts                 # Express app, routes, swagger UI
 src/config.ts              # dotenv + env
+src/metrics.ts             # Prometheus registry, HTTP + Trafikverket instruments
 src/swagger.ts             # OpenAPI spec (swagger-jsdoc)
 src/trafikverket/client.ts # POST XML → JSON, unwrap RESPONSE.RESULT[0][entityName]
+observability/prometheus   # Prometheus image + scrape config (Railway)
+observability/grafana      # Grafana image, datasource, dashboard (Railway)
 src/common/view.ts         # HTML departure table (not currently wired from handlers)
 src/{stations,train,announcement}/
   *-handler.ts             # Express Router + @openapi JSDoc
@@ -47,6 +50,7 @@ HTTP surface:
 
 - `GET /` — welcome
 - `GET /health` — `OK`
+- `GET /metrics` — Prometheus text metrics
 - `GET /api-docs` — Swagger UI
 - `GET /openapi.json`
 - `GET /api/stations`

@@ -1,6 +1,10 @@
 import { stringify } from '@libs/xml';
 import type { stringifyable } from '@libs/xml/stringify';
 import config from '../config.js';
+import {
+  recordTrafikverketResult,
+  startTrafikverketTimer,
+} from '../metrics.js';
 const API_URL = 'https://api.trafikinfo.trafikverket.se/v2/data.json';
 
 const MAX_CHANGEID_PAGES = 100;
@@ -90,39 +94,51 @@ const postPage = async <T>(
   query: stringifyable,
   entityName: string
 ): Promise<QueryPage<T>> => {
-  const apiKey = config.trafikverketApiKey;
-  const body = stringify({
-    REQUEST: {
-      LOGIN: {
-        '@authenticationkey': apiKey,
+  const endTimer = startTrafikverketTimer(entityName);
+  try {
+    const apiKey = config.trafikverketApiKey;
+    const body = stringify({
+      REQUEST: {
+        LOGIN: {
+          '@authenticationkey': apiKey,
+        },
+        QUERY: query,
       },
-      QUERY: query,
-    },
-  });
-  const response = await fetch(API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'text/xml' },
-    body,
-    cache: 'no-cache',
-  });
+    });
+    const response = await fetch(API_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'text/xml' },
+      body,
+      cache: 'no-cache',
+    });
 
-  // 206 is "response too large" — a page, not an error. Parse INFO.LASTCHANGEID.
-  if (response.status === 206) {
+    // 206 is "response too large" — a page, not an error. Parse INFO.LASTCHANGEID.
+    if (response.status === 206) {
+      const json = (await response.json()) as TrafikverketResponse;
+      const page = parseResult<T>(json, entityName, true);
+      recordTrafikverketResult(entityName, 'truncated');
+      return page;
+    }
+
     const json = (await response.json()) as TrafikverketResponse;
-    return parseResult<T>(json, entityName, true);
-  }
+    if (!response.ok) {
+      const detail = errorMessageOf(json);
+      throw new Error(
+        detail
+          ? `Trafikverket HTTP ${response.status}: ${detail}`
+          : `Trafikverket HTTP ${response.status}`
+      );
+    }
 
-  const json = (await response.json()) as TrafikverketResponse;
-  if (!response.ok) {
-    const detail = errorMessageOf(json);
-    throw new Error(
-      detail
-        ? `Trafikverket HTTP ${response.status}: ${detail}`
-        : `Trafikverket HTTP ${response.status}`
-    );
+    const page = parseResult<T>(json, entityName, false);
+    recordTrafikverketResult(entityName, 'success');
+    return page;
+  } catch (err) {
+    recordTrafikverketResult(entityName, 'error');
+    throw err;
+  } finally {
+    endTimer();
   }
-
-  return parseResult<T>(json, entityName, false);
 };
 
 const post = async <T>(

@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@libs/xml": "npm:@jsr/libs__xml@^7.0.2",
+    "@prometheus-io/client": "^0.16.1",
     "@types/express": "^5.0.5",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
