@@ -56,7 +56,7 @@ apiRouter.use('/disruptions', disruptionsRouter);
 app.use('/api', apiRouter);
 
 export const start = () => {
-  app.listen(Number(config.port), '0.0.0.0', () => {
+  app.listen(Number(config.port), '::', () => {
     console.info(`listening on port ${config.port}`);
   });
 };

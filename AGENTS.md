@@ -16,7 +16,7 @@ npm run dev            # tsx watch, port 3000
 
 - Node 24 (see `dockerfile`). Package manager is npm (`package-lock.json`).
 - `.npmrc` maps `@jsr` to `https://npm.jsr.io` for `@libs/xml`.
-- Required env: `TRAFIKVERKET_API_KEY`. Optional: `SERVER_PORT` (defined in `src/config.ts` but `src/app.ts` currently listens on `3000` hardcoded).
+- Required env: `TRAFIKVERKET_API_KEY`. Optional: `SERVER_PORT` (and Railway `PORT`). The process listens on `::` so private IPv6 scrapes work.
 - Never commit `.env`. Never log or echo the API key.
 
 ## Commands
