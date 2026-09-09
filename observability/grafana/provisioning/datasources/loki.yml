@@ -1,5 +1,6 @@
 apiVersion: 1
 
+# Loki is private on Railway. LOKI_URL should be http://<loki private domain>:3100
 datasources:
   - name: Loki
     uid: loki
