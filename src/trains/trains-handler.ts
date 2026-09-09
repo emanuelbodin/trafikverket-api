@@ -1,5 +1,6 @@
 import { Router } from 'express';
 import { parseAdvertisedTimeWindow } from '../announcement/advertised-time-window.js';
+import { logRouteError } from '../logger.js';
 import { fetchTrainJourney, fetchTrainLivePosition } from './trains-service.js';
 
 const router = Router();
@@ -193,7 +194,7 @@ router.get('/:trainId', async (req, res) => {
   } catch (err) {
     const message =
       err instanceof Error ? err.message : 'Failed to fetch train journey';
-    console.error(`GET /api/trains/:trainId failed: ${message}`);
+    logRouteError(req, err, 'GET /api/trains/:trainId failed');
     return res.status(502).json({ error: message });
   }
 });

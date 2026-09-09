@@ -1,4 +1,5 @@
 import { Router, type Request, type Response } from 'express';
+import { logRouteError } from '../logger.js';
 import type { StationLookupResult } from '../stations/station-lookup.js';
 import { resolveStation } from '../stations/stations-service.js';
 import { fetchCurrentDisruptions } from './disruptions-service.js';
@@ -135,7 +136,7 @@ router.get('', async (req: Request, res: Response) => {
     return res.json(disruptions);
   } catch (err) {
     const message = err instanceof Error ? err.message : 'Failed to fetch disruptions';
-    console.error(`GET /api/disruptions failed: ${message}`);
+    logRouteError(req, err, 'GET /api/disruptions failed');
     return res.status(502).json({ error: message });
   }
 });

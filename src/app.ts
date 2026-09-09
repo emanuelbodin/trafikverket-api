@@ -9,11 +9,13 @@ import announcementRouter from './announcement/announcement-handler.js';
 import disruptionsRouter from './disruptions/disruptions-handler.js';
 import { swaggerSpec } from './swagger.js';
 import config from './config.js';
+import { flushLogger, logger, requestLoggingMiddleware } from './logger.js';
 import { httpMetricsMiddleware, register } from './metrics.js';
 
 export const app = express();
 
 app.use(cors({ origin: '*' }));
+app.use(requestLoggingMiddleware);
 app.use(httpMetricsMiddleware);
 
 app.get('/', (_req, res) =>
@@ -55,9 +57,26 @@ apiRouter.use('/announcements', announcementRouter);
 apiRouter.use('/disruptions', disruptionsRouter);
 app.use('/api', apiRouter);
 
+const shutDown = (signal: string) => {
+  logger.info({ signal }, 'shutting down');
+  flushLogger();
+  process.exit(0);
+};
+
 export const start = () => {
+  process.on('SIGTERM', () => shutDown('SIGTERM'));
+  process.on('SIGINT', () => shutDown('SIGINT'));
+  process.on('uncaughtException', (err) => {
+    logger.fatal({ err }, 'uncaught exception');
+    flushLogger();
+    process.exit(1);
+  });
+  process.on('unhandledRejection', (reason) => {
+    logger.error({ err: reason }, 'unhandled rejection');
+  });
+
   app.listen(Number(config.port), '::', () => {
-    console.info(`listening on port ${config.port}`);
+    logger.info({ port: config.port }, 'listening');
   });
 };
 
