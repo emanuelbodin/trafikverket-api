@@ -50,7 +50,7 @@ describe('structured logging', () => {
     assert.equal(lines[0]?.requestId, 'req-1');
     assert.equal(lines[0]?.entity, 'TrainAnnouncement');
     assert.deepEqual(lines[0]?.meta, { requestId: 'req-1' });
-    assert.equal(typeof lines[0]?.time, 'string');
+    assert.equal(typeof lines[0]?.time, 'number');
   });
 
   test('redacts API key fields', () => {

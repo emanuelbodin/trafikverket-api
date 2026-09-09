@@ -40,7 +40,6 @@ const loggerOptions = (level: string): LoggerOptions => ({
     service: 'trafikverket-api',
   },
   messageKey: 'msg',
-  timestamp: pino.stdTimeFunctions.isoTime,
   redact: { paths: redactPaths, censor: '[Redacted]' },
   formatters: {
     level(label, number) {
