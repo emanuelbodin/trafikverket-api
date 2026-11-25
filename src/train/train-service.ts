@@ -3,6 +3,7 @@ import {
   type JourneyMeta,
 } from '../announcement/announcement-service.js';
 import client from '../trafikverket/client.js';
+import { DEFAULT_POSITION_MAX_AGE_SECONDS } from './position-max-age.js';
 import {
   getTrainPositionForTrainQuery,
   getTrainPositionQuery,
@@ -108,13 +109,51 @@ const toTrainPositionRecord = (
   };
 };
 
+const modifiedTimeMs = (value?: string): number | undefined => {
+  if (!value) return undefined;
+  const ms = Date.parse(value);
+  return Number.isFinite(ms) ? ms : undefined;
+};
+
 const byModifiedTimeDesc = (
   a: TrainPosition,
   b: TrainPosition
 ): number => {
+  const aMs = modifiedTimeMs(a.ModifiedTime);
+  const bMs = modifiedTimeMs(b.ModifiedTime);
+  if (aMs != null && bMs != null) return bMs - aMs;
   const aTime = a.ModifiedTime ?? '';
   const bTime = b.ModifiedTime ?? '';
   return bTime.localeCompare(aTime);
+};
+
+const trainIdentityKey = (position: TrainPosition): string | undefined => {
+  const number = position.Train?.OperationalTrainNumber?.trim() ?? '';
+  const date = position.Train?.OperationalTrainDepartureDate?.trim() ?? '';
+  if (!number && !date) return undefined;
+  return `${number}\0${date}`;
+};
+
+/** Keep the latest ModifiedTime row per operational train identity. */
+const dedupeLatestPositions = (
+  positions: TrainPosition[]
+): TrainPosition[] => {
+  const latest = new Map<string, TrainPosition>();
+  const anonymous: TrainPosition[] = [];
+
+  for (const position of positions) {
+    const key = trainIdentityKey(position);
+    if (key === undefined) {
+      anonymous.push(position);
+      continue;
+    }
+    const existing = latest.get(key);
+    if (!existing || byModifiedTimeDesc(position, existing) < 0) {
+      latest.set(key, position);
+    }
+  }
+
+  return [...latest.values(), ...anonymous];
 };
 
 /** WKT `POINT (lng lat)` → numeric lat/lng. Trafikverket WGS84 uses lon then lat. */
@@ -133,16 +172,19 @@ export const parseWgs84Point = (
 };
 
 export const fetchTrainPositions = async (
-  tv: Pick<typeof client, 'postAllPages'> = client
+  tv: Pick<typeof client, 'postAllPages'> = client,
+  maxAgeSeconds: number = DEFAULT_POSITION_MAX_AGE_SECONDS
 ) => {
-  const query = getTrainPositionQuery();
-  const positions = await tv.postAllPages<TrainPosition>(
+  const query = getTrainPositionQuery(maxAgeSeconds);
+  const rawPositions = await tv.postAllPages<TrainPosition>(
     query,
     'TrainPosition'
   );
-  if (!Array.isArray(positions)) {
+  if (!Array.isArray(rawPositions)) {
     throw new Error('Expected TrainPosition array from Trafikverket');
   }
+
+  const positions = dedupeLatestPositions(rawPositions);
 
   const idents = [
     ...new Set(

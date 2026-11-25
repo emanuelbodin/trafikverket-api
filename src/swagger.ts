@@ -44,6 +44,19 @@ const options: swaggerJsdoc.Options = {
           description:
             'Upper bound on AdvertisedTimeAtLocation (`LT`). ISO-8601 date-time. Omit for no upper bound. Neither `from` nor `to` means no advertised-time filter.',
         },
+        TrainPositionMaxAge: {
+          in: 'query',
+          name: 'maxAge',
+          required: false,
+          schema: {
+            type: 'integer',
+            minimum: 30,
+            maximum: 3600,
+            default: 300,
+          },
+          description:
+            'Maximum age of TrainPosition.ModifiedTime in seconds. Default 300 (5 minutes). Valid range 30–3600. Invalid values return JSON 400 `{ error }`.',
+        },
       },
       schemas: {
         LocationInfo: {
