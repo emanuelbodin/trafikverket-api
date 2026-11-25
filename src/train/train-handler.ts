@@ -1,4 +1,6 @@
 import { Router, type Request, type Response } from 'express';
+import client from '../trafikverket/client.js';
+import { parseMaxAge } from './position-max-age.js';
 import { fetchTrainPositions } from './train-service.js';
 
 const router = Router();
@@ -71,24 +73,38 @@ const router = Router();
  *   get:
  *     tags:
  *       - Train
- *     summary: Get all active train positions
+ *     summary: Get recent active train positions
  *     description: >
- *       Complete snapshot of currently active trains (`Status.Active=true`).
- *       Pages Trafikverket with `changeid` until the response is done
- *       (HTTP 206 = too large, continue from `INFO.LASTCHANGEID`; omitted
- *       entity key = empty/done). There is no 59-second `ModifiedTime` window
- *       and no `@limit` cap — this is every active train, not recent updates.
+ *       Snapshot of currently active trains (`Status.Active=true`) whose
+ *       `ModifiedTime` falls within a recency window (default 5 minutes).
+ *       Optional `maxAge` (integer seconds, 30–3600) changes that window.
+ *       Duplicate rows for the same operational train
+ *       (`operationalTrainNumber` + `operationalTrainDepartureDate`) are
+ *       reduced to the latest `modifiedTime`. Pages Trafikverket with
+ *       `changeid` until the response is done (HTTP 206 = too large,
+ *       continue from `INFO.LASTCHANGEID`; omitted entity key = empty/done).
  *       `operator` (and `fromName`/`toName` when known) are joined in bulk from
  *       TrainAnnouncement by advertised train number — not one request per train.
+ *     parameters:
+ *       - $ref: '#/components/parameters/TrainPositionMaxAge'
  *     responses:
  *       200:
- *         description: Complete list of active train positions
+ *         description: Recent active train positions, one per operational train
  *         content:
  *           application/json:
  *             schema:
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/TrainPositionSnapshot'
+ *       400:
+ *         description: Invalid `maxAge` (not an integer, or outside 30–3600)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  */
 /**
  * @openapi
@@ -96,23 +112,41 @@ const router = Router();
  *   get:
  *     tags:
  *       - Train
- *     summary: Get all active train positions
+ *     summary: Get recent active train positions
  *     description: >
- *       Alias of `/api/train/position`. Complete snapshot of currently active
- *       trains (`Status.Active=true`), paged with `changeid` until Trafikverket
- *       is done. Includes bulk-joined `operator` when known.
+ *       Alias of `/api/train/position`. Snapshot of currently active trains
+ *       (`Status.Active=true`) whose `ModifiedTime` falls within a recency
+ *       window (default 5 minutes; optional `maxAge` in seconds, 30–3600).
+ *       Duplicate operational trains are reduced to the latest `modifiedTime`.
+ *       Paged with `changeid` until Trafikverket is done. Includes bulk-joined
+ *       `operator` when known.
+ *     parameters:
+ *       - $ref: '#/components/parameters/TrainPositionMaxAge'
  *     responses:
  *       200:
- *         description: Complete list of active train positions
+ *         description: Recent active train positions, one per operational train
  *         content:
  *           application/json:
  *             schema:
  *               type: array
  *               items:
  *                 $ref: '#/components/schemas/TrainPositionSnapshot'
+ *       400:
+ *         description: Invalid `maxAge` (not an integer, or outside 30–3600)
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 error:
+ *                   type: string
  */
-export const getTrainPositions = async (_req: Request, res: Response) => {
-  const positions = await fetchTrainPositions();
+export const getTrainPositions = async (req: Request, res: Response) => {
+  const parsed = parseMaxAge(req.query.maxAge);
+  if (!parsed.ok) {
+    return res.status(400).json({ error: parsed.error });
+  }
+  const positions = await fetchTrainPositions(client, parsed.seconds);
   return res.json(positions);
 };
 

@@ -59,7 +59,8 @@ HTTP surface:
 - `GET /api/stations/:station/departures` — query: `from`, `to`, `canceled`, `delayed`
 - `GET /api/stations/:station/arrivals` — query: `from`, `to`, `canceled`, `delayed`
 - `GET /api/trains/:trainId` — query: `from`, `to`
-- `GET /api/train/position`
+- `GET /api/train/position` — query: optional `maxAge` (seconds, 30–3600, default 300)
+- `GET /api/positions` — alias of `/api/train/position` (no `/api/positions/stream` SSE endpoint)
 - `GET /api/announcements/departures/:from` — query: `from`, `to`, `canceled`, `delayed`
 - `GET /api/announcements/train/:trainId` — query: `from`, `to`
 
@@ -73,6 +74,7 @@ HTTP surface:
 - Document new/changed routes with `@openapi` JSDoc on the handler. Shared schemas live in `src/swagger.ts`. After route changes, confirm `/openapi.json` still matches.
 - Query objects use `@attribute` keys (`@objecttype`, `@name`, `@value`) because they are serialized to XML.
 - TrainAnnouncement list queries have no default advertised-time window. Optional `from`/`to` query params become `GT`/`LT` on `AdvertisedTimeAtLocation`. The bulk operator join (`getAnnouncementsForTrainIdentsQuery`) keeps an internal ~24h/12h `$dateadd` bound. Invalid timestamps return JSON 400 `{ error }`.
+- Bulk TrainPosition queries (`GET /api/train/position` and `/api/positions`) filter `Status.Active=true` AND `ModifiedTime > $dateadd(-HH:MM:SS)`. Default window is 5 minutes (`maxAge=300`). Optional `maxAge` is an integer 30–3600 seconds; invalid values return JSON 400 `{ error }`. Results are deduped to the latest `modifiedTime` per `operationalTrainNumber` + `operationalTrainDepartureDate`.
 - Prefer `async` route handlers and `res.json(...)`. Do not add a framework or ORM.
 
 ## When changing Trafikverket queries

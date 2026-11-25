@@ -1,10 +1,23 @@
-export const getTrainPositionQuery = () => {
+import {
+  DEFAULT_POSITION_MAX_AGE_SECONDS,
+  toDateAddOffset,
+} from './position-max-age.js';
+
+export const getTrainPositionQuery = (
+  maxAgeSeconds: number = DEFAULT_POSITION_MAX_AGE_SECONDS
+) => {
   return {
     '@objecttype': 'TrainPosition',
     '@schemaversion': '1.1',
     '@namespace': 'järnväg.trafikinfo',
     FILTER: {
-      EQ: [{ '@name': 'Status.Active', '@value': 'true' }],
+      AND: {
+        EQ: [{ '@name': 'Status.Active', '@value': 'true' }],
+        GT: {
+          '@name': 'ModifiedTime',
+          '@value': toDateAddOffset(maxAgeSeconds),
+        },
+      },
     },
     INCLUDE: [
       'ModifiedTime',
